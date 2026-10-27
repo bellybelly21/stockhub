@@ -3,6 +3,13 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_key';
 
+// Interfaz
+interface JwtPayload {
+  id: string;
+  role: string;
+  warehouseId?: string | null;
+}
+
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -16,8 +23,8 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
       return res.status(403).json({ error: 'Token inválido o expirado' });
     }
     
-    // Pobla el objeto user definido en custom.d.ts
-    req.user = decoded as any; 
+    // Casteo seguro hacia la estructura esperada
+    req.user = decoded as JwtPayload; 
     next();
   });
 };
