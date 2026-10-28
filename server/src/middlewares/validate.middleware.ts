@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodSchema, ZodError, ZodIssue } from 'zod';
 
-export const validateSchema = (schema: AnyZodObject) => 
-  (req: Request, res: Response, next: NextFunction) => {
+export const validateSchema = (schema: ZodSchema) => 
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse({
+      await schema.parseAsync({
         body: req.body,
         query: req.query,
         params: req.params,
@@ -13,10 +13,17 @@ export const validateSchema = (schema: AnyZodObject) =>
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({
-          error: 'Error de validación de datos',
-          details: error.errors.map(e => ({ campo: e.path.join('.'), mensaje: e.message }))
+          success: false,
+          error: 'Datos de entrada inválidos',
+          details: error.issues.map((e: ZodIssue) => ({
+            campo: e.path.join('.'),
+            mensaje: e.message
+          }))
         });
       }
-      return res.status(500).json({ error: 'Error interno de validación' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Error de validación desconocido' 
+      });
     }
   };

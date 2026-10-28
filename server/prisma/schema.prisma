@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ================= ENUMS =================
@@ -15,10 +14,10 @@ enum Role {
   VENDEDOR
 }
 
-// Estado del producto en el catálogo general
 enum ProductStatus {
   ACTIVO
   EN_OFERTA
+  DONADO
   INACTIVO
 }
 
@@ -32,7 +31,6 @@ enum MovementType {
   DONACION
 }
 
-// Listado cerrado de motivos para justificar mermas y ajustes
 enum AdjustmentReason {
   DANADO_RECEPCION
   MERMA_FISICA
@@ -44,27 +42,28 @@ enum AdjustmentReason {
 // ================= MODELOS =================
 
 model User {
-  id                  String   @id @default(uuid())
-  email               String   @unique
+  id                  String     @id @default(uuid())
+  email               String     @unique
   name                String
-  password            String   
+  password            String     // Hash bcrypt
   role                Role
-  isActive            Boolean  @default(true) 
+  isActive            Boolean    @default(true) // Baja lógica de usuario
   
   assignedWarehouse   Warehouse? @relation("UserAssignedWarehouse", fields: [assignedWarehouseId], references: [id])
   assignedWarehouseId String?
   
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   movements           Movement[]
   sales               Sale[]
-  refreshTokens       RefreshToken[] 
+  refreshTokens       RefreshToken[]
+  @@index([role])
 }
 
 model RefreshToken {
   id        String   @id @default(uuid())
-  token     String   @unique
+  tokenHash String   @unique // Almacenamiento seguro del hash del refresh token
   expiresAt DateTime
   isRevoked Boolean  @default(false)
   
@@ -72,22 +71,25 @@ model RefreshToken {
   userId    String
   
   createdAt DateTime @default(now())
+  @@index([userId])
 }
 
 model Product {
   id            String        @id @default(uuid())
   sku           String        @unique
-  barcode       String?       @unique 
+  barcode       String        @unique
   name          String
   brand         String
   supplier      String
   
-  volume        Decimal?      @db.Decimal(10, 4) 
-  weight        Decimal?      @db.Decimal(10, 3) 
-  unitOfMeasure String        // ej: "UNIDAD", "KG", "LITRO"
+  // Opcionales en BD para soportar productos medidos por peso O por volumen
+  volume        Decimal?      @db.Decimal(10, 4) // ej: m3 o litros
+  weight        Decimal?      @db.Decimal(10, 3) // ej: kg (soporta 100 kg sin problema)
+  unitOfMeasure String        // "UNIDAD", "KG", "LITRO", etc.
+  
   basePrice     Decimal       @db.Decimal(12, 2)
-  criticalStock Decimal       @default(10) @db.Decimal(12, 3) 
-  status        ProductStatus @default(ACTIVO) 
+  criticalStock Decimal       @default(10) @db.Decimal(12, 3)
+  status        ProductStatus @default(ACTIVO)
   
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -95,15 +97,18 @@ model Product {
   stocks        Stock[]
   movements     Movement[]
   saleDetails   SaleDetail[]
+
+  @@index([barcode])
+  @@index([status])
 }
 
 model Warehouse {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   name          String
   location      String?
-  isActive      Boolean  @default(true)
+  isActive      Boolean    @default(true)
 
-  assignedUsers User[]   @relation("UserAssignedWarehouse")
+  assignedUsers User[]     @relation("UserAssignedWarehouse")
   stocks        Stock[]
   movementsFrom Movement[] @relation("WarehouseFrom")
   movementsTo   Movement[] @relation("WarehouseTo")
@@ -112,7 +117,7 @@ model Warehouse {
 
 model Stock {
   id          String    @id @default(uuid())
-  quantity    Decimal   @default(0) @db.Decimal(12, 3) 
+  quantity    Decimal   @default(0) @db.Decimal(12, 3) // Soporta fraccionados (ej. KG)
   
   product     Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
   productId   String
@@ -120,7 +125,8 @@ model Stock {
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
   warehouseId String
 
-  @@unique([productId, warehouseId]) 
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
 }
 
 model Movement {
@@ -146,12 +152,16 @@ model Movement {
   saleId          String?
   
   createdAt       DateTime          @default(now())
+
+  @@index([productId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Sale {
   id          String       @id @default(uuid())
   total       Decimal      @db.Decimal(12, 2)
-  isActive    Boolean      @default(true) // Permite anulación lógica de la venta
+  isActive    Boolean      @default(true) // Anulación
   
   seller      User         @relation(fields: [sellerId], references: [id])
   sellerId    String
@@ -164,6 +174,10 @@ model Sale {
 
   details     SaleDetail[]
   movements   Movement[]   
+
+  @@index([createdAt])
+  @@index([sellerId])
+  @@index([warehouseId])
 }
 
 model SaleDetail {
@@ -177,4 +191,6 @@ model SaleDetail {
 
   product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
   productId String
+
+  @@index([saleId])
 }
