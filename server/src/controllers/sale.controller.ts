@@ -9,6 +9,7 @@ export class SaleController {
       const sellerId = req.user!.id;
       const warehouseId = req.user!.warehouseId;
       const saleData: CreateSaleInput = req.body;
+      const idempotencyKey = req.headers['idempotency-key'] as string;
 
       // Un usuario no puede vender si no está físicamente asignado a una bodega
       if (!warehouseId) {
@@ -18,8 +19,13 @@ export class SaleController {
         });
       }
 
+      // Es necesario el idempotency para no repetir ventas
+      if (!idempotencyKey) {
+        return res.status(400).json({ success: false, error: 'Header Idempotency-Key es obligatorio' });
+      }
+
       // Llamamos al servicio con los datos sanitizados y seguros
-      const sale = await SaleService.processSale(sellerId, warehouseId, saleData);
+      const sale = await SaleService.processSale(sellerId, warehouseId, saleData, idempotencyKey);
       
       return res.status(201).json({
         success: true,

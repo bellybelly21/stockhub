@@ -6,6 +6,7 @@ export const createSaleSchema = z.object({
       z.object({
         productId: z.string().uuid({ message: 'Formato de ID de producto inválido' }),
         quantity: z.number().positive({ message: 'La cantidad debe ser mayor a cero' }),
+        expectedPrice: z.number().positive()
       })
     ).min(1, { message: 'La venta debe incluir al menos un producto' }),
   }),

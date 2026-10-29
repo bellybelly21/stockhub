@@ -178,6 +178,7 @@ model Sale {
   @@index([createdAt])
   @@index([sellerId])
   @@index([warehouseId])
+  idempotencyKey String? @unique
 }
 
 model SaleDetail {

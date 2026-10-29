@@ -17,7 +17,7 @@ export const validateSchema = (schema: ZodSchema) =>
           error: 'Datos de entrada inválidos',
           details: error.issues.map((e: ZodIssue) => ({
             campo: e.path.join('.'),
-            mensaje: e.message
+            mensaje: e.message,
           }))
         });
       }
