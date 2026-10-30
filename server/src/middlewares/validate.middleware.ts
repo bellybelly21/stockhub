@@ -4,7 +4,7 @@ import { ZodSchema, ZodError } from 'zod';
 export const validateSchema = (schema: ZodSchema) => 
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse({
+      await schema.parseAsync({
         body: req.body,
         query: req.query,
         params: req.params,
@@ -17,6 +17,9 @@ export const validateSchema = (schema: ZodSchema) =>
           details: error.issues.map(e => ({ campo: e.path.join('.'), mensaje: e.message }))
         });
       }
-      return res.status(500).json({ error: 'Error interno de validación' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Error de validación desconocido' 
+      });
     }
   };

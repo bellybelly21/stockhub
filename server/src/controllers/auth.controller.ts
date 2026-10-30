@@ -1,53 +1,74 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../db/client';
+import * as bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret_key';
-const JWT_EXPIRES = '8h'; //Expiración estricta de 8 horas
+export class AuthController {
+  static async login(req: Request, res: Response) {
+    try {
+      const { email, password } = req.body;
 
-export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+      // Buscar al usuario
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
 
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
+      if (!user || !user.isActive) {
+        return res.status(401).json({ success: false, error: 'Credenciales inválidas o usuario inactivo' });
+      }
 
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Credenciales inválidas o cuenta inactiva' });
-    }
+      // Verificar la contraseña
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ success: false, error: 'Credenciales inválidas' });
+      }
 
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
-    }
+      // Generar el Access Token (Vida 15 minutos)
+      const accessToken = jwt.sign(
+        {
+          id: user.id,
+          role: user.role,
+          warehouseId: user.assignedWarehouseId,
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: '15m' }
+      );
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role, warehouseId: user.assignedWarehouseId },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
+      // Generar el Refresh Token bruto (random bytes de 64 caracteres)
+      const rawRefreshToken = crypto.randomBytes(32).toString('hex');
 
-    const refreshTokenString = bcrypt.genSaltSync(10);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+      // Generar el Hash SHA-256 para guardarlo de forma segura en la BD
+      const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
 
-    // Revoca tokens viejos del usuario y crea el nuevo
-    await prisma.$transaction([
-      prisma.refreshToken.updateMany({
-        where: { userId: user.id, isRevoked: false },
-        data: { isRevoked: true }
-      }),
-      prisma.refreshToken.create({
+      // Calcular expiración a 7 días
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Guardar el hash en el modelo RefreshToken
+      await prisma.refreshToken.create({
         data: {
-          token: refreshTokenString,
+          tokenHash,
           expiresAt,
           userId: user.id,
-        }
-      })
-    ]);
+        },
+      });
 
-    res.json({ token, refreshToken: refreshTokenString, role: user.role });
-  } catch (error) {
-    res.status(500).json({ error: 'Error interno del servidor' });
+      // Devolver el Access Token y el Refresh Token crudo al cliente
+      return res.status(200).json({
+        success: true,
+        accessToken,
+        refreshToken: rawRefreshToken, // El cliente recibe la versión sin hashear
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error('Error en login:', error);
+      return res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
   }
-};
+}
