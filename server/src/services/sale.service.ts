@@ -9,7 +9,7 @@ export class SaleService {
     data: CreateSaleInput,
     idempotencyKey: string
   ) {
-    // Verificar si esta petición ya se procesó con éxito
+    // 1. Verificar si esta petición ya se procesó con éxito
     const existingSale = await prisma.sale.findUnique({
       where: { idempotencyKey },
       include: { details: true }
@@ -19,7 +19,7 @@ export class SaleService {
     const MAX_RETRIES = 3;
     let attempt = 0;
 
-    // Bucle de reintentos para manejar Deadlocks de PostgreSQL
+    // 2. Bucle de reintentos para manejar Deadlocks de PostgreSQL
     while (attempt < MAX_RETRIES) {
       try {
         return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -27,28 +27,37 @@ export class SaleService {
           const saleDetails = [];
           const movements = [];
 
-      if (!stocks[0] || Number(stocks[0].quantity) < item.quantity) {
-        throw new Error(`Stock insuficiente para el producto ${item.productId}`);
-      }
+          // 3. Inicio del bucle sobre cada item de la venta
+          for (const item of data.items) {
+            
+            // Obtener el producto para validar el precio
+            const product = await tx.product.findUnique({
+              where: { id: item.productId }
+            });
+
+            if (!product) {
+              throw new Error(`Producto no encontrado: ${item.productId}`);
+            }
 
             // Verificar discrepancia de precios
             if (Number(product.basePrice) !== item.expectedPrice) {
               throw new Error(`Mapeo de precio fallido para ${product.name}. Precio actual es ${product.basePrice}`);
             }
 
-            // Bloqueo de fila para concurrencia extrema
+            // Bloqueo de fila para concurrencia extrema (FOR UPDATE)
             const stocks = await tx.$queryRawUnsafe<Array<{ id: string; quantity: Prisma.Decimal }>>(
               'SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE',
               item.productId,
               warehouseId
             );
 
+            // Validar stock disponible
             const stock = stocks[0];
             if (!stock || Number(stock.quantity) < item.quantity) {
               throw new Error(`Stock insuficiente para el producto ${product.name}`);
             }
 
-            // Actualizar stock atómicamente con raw query para evitar el bug de tipos de Prisma
+            // Actualizar stock atómicamente con raw query
             await tx.$queryRawUnsafe(
               'UPDATE "Stock" SET quantity = quantity - $1 WHERE id = $2',
               item.quantity,
@@ -77,13 +86,13 @@ export class SaleService {
             });
           }
 
-          // Crear la Venta, Detalles y Movimientos en una sola operación
+          // 4. Crear la Venta, Detalles y Movimientos en una sola operación
           return await tx.sale.create({
             data: {
               total: totalSale,
               sellerId,
               warehouseId, 
-              idempotencyKey, // Guardar la llave para bloquear duplicados futuros
+              idempotencyKey,
               details: { create: saleDetails },
               movements: { create: movements },
             },
