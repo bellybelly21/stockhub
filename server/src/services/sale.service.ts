@@ -27,12 +27,9 @@ export class SaleService {
           const saleDetails = [];
           const movements = [];
 
-          for (const item of data.items) {
-            // Verificar existencia y estado del producto
-            const product = await tx.product.findUnique({ where: { id: item.productId } });
-            if (!product || product.status !== 'ACTIVO') {
-              throw new Error(`El producto ${item.productId} no existe o no está activo.`);
-            }
+      if (!stocks[0] || Number(stocks[0].quantity) < item.quantity) {
+        throw new Error(`Stock insuficiente para el producto ${item.productId}`);
+      }
 
             // Verificar discrepancia de precios
             if (Number(product.basePrice) !== item.expectedPrice) {
