@@ -20,7 +20,7 @@ export const registerSale = async (sellerId: string, warehouseId: string, items:
         FOR UPDATE
       `;
 
-      if (!stocks.length || Number(stocks[0].quantity) < item.quantity) {
+      if (!stocks[0] || Number(stocks[0].quantity) < item.quantity) {
         throw new Error(`Stock insuficiente para el producto ${item.productId}`);
       }
 

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodSchema, ZodError } from 'zod';
 
-export const validateSchema = (schema: AnyZodObject) => 
+export const validateSchema = (schema: ZodSchema) => 
   (req: Request, res: Response, next: NextFunction) => {
     try {
       schema.parse({
@@ -14,7 +14,7 @@ export const validateSchema = (schema: AnyZodObject) =>
       if (error instanceof ZodError) {
         return res.status(400).json({
           error: 'Error de validación de datos',
-          details: error.errors.map(e => ({ campo: e.path.join('.'), mensaje: e.message }))
+          details: error.issues.map(e => ({ campo: e.path.join('.'), mensaje: e.message }))
         });
       }
       return res.status(500).json({ error: 'Error interno de validación' });
