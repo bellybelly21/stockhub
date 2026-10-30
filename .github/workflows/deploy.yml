@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,7 +37,7 @@ jobs:
         run: npm i -g @railway/cli
 
       - name: Desplegar Backend a Railway
-        run: railway up --ci
+        run: railway up --ci --service stockhub
         working-directory: ./server
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
