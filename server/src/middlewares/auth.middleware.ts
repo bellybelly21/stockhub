@@ -2,6 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        warehouseId: string | null;
+        role: Role;
+      };
+    }
+  }
+}
+
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
@@ -21,7 +33,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     req.user = {
       id: decoded.id,
       role: decoded.role,
-      warehouseId: decoded.warehouseId ?? null,
+      warehouseId: decoded.warehouseId || null,
     };
     next();
   } catch (error) {
