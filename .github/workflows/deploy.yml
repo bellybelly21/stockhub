@@ -1,6 +1,5 @@
-name: Deploy to Railway
+name: Deploy Backend to Railway
 
-# ¿Cuándo se ejecutará esto? Cuando hagamos un 'push' a la rama 'main'
 on:
   push:
     branches:
@@ -8,26 +7,21 @@ on:
 
 jobs:
   deploy:
-    # El servidor virtual donde se ejecutará la acción
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. El robot descarga tu código del repositorio
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Descargar codigo del repositorio
+        uses: actions/checkout@v4
 
-      # 2. El robot instala Node.js versión 20
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Configurar Node.js (v20)
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 3. El robot instala la herramienta CLI (consola) de Railway
-      - name: Install Railway CLI
+      - name: Instalar Railway CLI
         run: npm i -g @railway/cli
 
-        - name: Desplegar Backend a Railway
-        # Ejecutamos el despliegue indicando la carpeta del servidor
+      - name: Desplegar Backend a Railway
         run: railway up --ci --service server
         working-directory: ./server
         env:
