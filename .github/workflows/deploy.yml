@@ -22,7 +22,7 @@ jobs:
         run: npm i -g @railway/cli
 
       - name: Desplegar Backend a Railway
-        run: railway up --ci --service server
+        run: railway up --ci --service stockhub
         working-directory: ./server
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
