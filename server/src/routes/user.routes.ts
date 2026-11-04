@@ -7,11 +7,11 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
-// Todas las rutas de administración de usuarios requieren autenticación y rol ADMIN
 router.use(requireAuth, requireRole([Role.ADMIN]));
 
 router.post('/', validateSchema(createUserSchema), UserController.create);
 router.get('/', UserController.getAll);
 router.patch('/:id', validateSchema(updateUserSchema), UserController.update);
+router.patch('/:id/status', UserController.toggleStatus);
 
 export default router;

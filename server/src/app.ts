@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 import saleRoutes from './routes/sales.routes';
 import authRoutes from './routes/auth.routes'; 
@@ -13,18 +14,19 @@ import stockRoutes from './routes/stock.routes';
 
 const app = express();
 
-// 1. Middlewares Globales y de Seguridad
+app.set('trust proxy', 1); // Permite leer la IP real del usuario en Railway
 app.use(helmet());
 
 app.use(cors({
-  // Permite localhost, tu dominio, y cualquier subdominio temporal de Railway
-  origin: ['http://localhost:5173', 'https://stockhub-project.up.railway.app', /\.railway\.app$/],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: ['http://localhost:5173', 'https://stockhub-project.up.railway.app'], // Removido el Regex inseguro
+  methods: ['GET', 'POST', 'PUT', 'PATCH'], 
+  credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10kb' })); // Prevención de ataques de payload
+app.use(cookieParser());
 
-// 2. Limitadores de Tasa
+// Limitadores de Tasa
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -34,12 +36,18 @@ app.use('/api', limiter);
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { success: false, error: 'Demasiados intentos de login. Cuenta bloqueada temporalmente.' }
+  // 100 intentos si estás probando en dev, 5 intentos en producción
+  max: process.env.NODE_ENV === 'production' ? 5 : 100, 
+  handler: (req, res) => {
+    return res.status(429).json({ 
+      success: false, 
+      error: 'Demasiados intentos fallidos. Por favor, reintenta en 15 minutos.' 
+    });
+  }
 });
 app.use('/api/auth/login', loginLimiter);
 
-// 3. Registro de Rutas
+// Rutas
 app.use('/api/sales', saleRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -48,7 +56,7 @@ app.use('/api/movements', movementRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/stock', stockRoutes);
 
-// 4. Manejo de Errores Globales
+// Manejo de Err
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('[Error Global]:', err);
   res.status(500).json({ error: 'Error interno del servidor' });

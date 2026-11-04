@@ -1,28 +1,33 @@
+import { BrowserRouter, Routes, Route } from 'react-router';
+import { AuthProvider } from './context/AuthContext';
+import Login from './Login'
+import ProtectedRoute from './components/ProtectedRoute';
+import UsersPage from './pages/UsersPage';
+import AddUser from './pages/AddUser';
 
 function App() {
-
   return (
-    <>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<Login />} />
 
-      <h1 className="text-3xl font-bold mb-6">Muestra de colores</h1>
+          {/* Rutas exclusivas para ADMIN */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['ADMIN']}><div className="p-8">Dashboard Admin (Estadísticas)</div></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><UsersPage /></ProtectedRoute>} />
+          <Route path="/users/add" element={<ProtectedRoute allowedRoles={['ADMIN']}><AddUser /></ProtectedRoute>} />
+          <Route path="/users/edit" element={<ProtectedRoute allowedRoles={['ADMIN']}><AddUser /></ProtectedRoute>} />
 
-      <div className="flex gap-6">
-        <span className="bg-white border-black border-2 p-6"></span>
-        <span className="bg-canvas border-black border-2 p-6"></span>
-        <span className="bg-surface border-black border-2 p-6"></span>
-        <span className="bg-dark border-black border-2 p-6"></span>
-        <span className="bg-slate-dark border-black border-2 p-6"></span>
-        <span className="bg-slate-mid border-black border-2 p-6"></span>
-        <span className="bg-slate-light border-black border-2 p-6"></span>
-        <span className="bg-primary border-black border-2 p-6"></span>
-        <span className="bg-primary-hover border-black border-2 p-6"></span>
-        <span className="bg-accent border-black border-2 p-6"></span>
-        <span className="bg-danger border-black border-2 p-6"></span>
-        <span className="bg-success-bg border-black border-2 p-6"></span>
-      </div>
+          {/* Rutas exclusivas para BODEGUERO */}
+          <Route path="/inventario" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-8">Vista de Inventario (Bodeguero)</div></ProtectedRoute>} />
 
-    </>
-  )
+          {/* Rutas exclusivas para VENDEDOR */}
+          <Route path="/ventas" element={<ProtectedRoute allowedRoles={['VENDEDOR', 'ADMIN']}><div className="p-8">Vista de Ventas (Vendedor)</div></ProtectedRoute>} />
+
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
