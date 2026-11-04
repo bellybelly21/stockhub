@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -17,6 +24,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Instalar dependencias del servidor
+        run: npm ci
+        working-directory: ./server
+
+      - name: Generar cliente de Prisma
+        run: npx prisma generate
+        working-directory: ./server
 
       - name: Instalar Railway CLI
         run: npm i -g @railway/cli
