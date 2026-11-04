@@ -1,74 +1,78 @@
 import { Request, Response } from 'express';
-import { prisma } from '../db/client';
-import * as bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import { AuthService } from '../services/auth.service';
+
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: true, 
+  sameSite: 'none' as const, 
+});
 
 export class AuthController {
   static async login(req: Request, res: Response) {
     try {
       const { email, password } = req.body;
+      const result = await AuthService.login(email, password);
 
-      // Buscar al usuario
-      const user = await prisma.user.findUnique({
-        where: { email },
+      res.cookie('refreshToken', result.rawRefreshToken, {
+        ...getCookieOptions(),
+        maxAge: result.EIGHT_HOURS_MS,
       });
 
-      if (!user || !user.isActive) {
-        return res.status(401).json({ success: false, error: 'Credenciales inválidas o usuario inactivo' });
-      }
-
-      // Verificar la contraseña
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ success: false, error: 'Credenciales inválidas' });
-      }
-
-      // Generar el Access Token (Vida 15 minutos)
-      const accessToken = jwt.sign(
-        {
-          id: user.id,
-          role: user.role,
-          warehouseId: user.assignedWarehouseId,
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: '15m' }
-      );
-
-      // Generar el Refresh Token bruto (random bytes de 64 caracteres)
-      const rawRefreshToken = crypto.randomBytes(32).toString('hex');
-
-      // Generar el Hash SHA-256 para guardarlo de forma segura en la BD
-      const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
-
-      // Calcular expiración a 7 días
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      // Guardar el hash en el modelo RefreshToken
-      await prisma.refreshToken.create({
-        data: {
-          tokenHash,
-          expiresAt,
-          userId: user.id,
-        },
-      });
-
-      // Devolver el Access Token y el Refresh Token crudo al cliente
       return res.status(200).json({
         success: true,
-        accessToken,
-        refreshToken: rawRefreshToken, // El cliente recibe la versión sin hashear
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
+        accessToken: result.accessToken,
+        user: result.user,
       });
-    } catch (error) {
-      console.error('Error en login:', error);
+    } catch (error: any) {
+      if (error.message === 'Credenciales inválidas') {
+        return res.status(401).json({ success: false, error: error.message });
+      }
+      console.error('[Auth Error - Login]:', error);
       return res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+  }
+
+  static async refresh(req: Request, res: Response) {
+    try {
+      const rawRefreshToken = req.cookies?.refreshToken;
+      if (!rawRefreshToken) {
+        return res.status(200).json({ success: false, authenticated: false });
+      }
+
+      const result = await AuthService.refresh(rawRefreshToken);
+
+      res.cookie('refreshToken', result.rawRefreshToken, {
+        ...getCookieOptions(),
+        maxAge: result.EIGHT_HOURS_MS,
+      });
+
+      return res.status(200).json({
+        success: true,
+        accessToken: result.accessToken,
+        user: result.user,
+      });
+    } catch (error: any) {
+      res.clearCookie('refreshToken', getCookieOptions());
+      
+      if (error.message === 'Alerta de seguridad: Sesión comprometida') {
+        return res.status(403).json({ success: false, error: error.message });
+      }
+      // Para token no encontrado, expirado o inactivo, simplemente negamos la autenticación
+      return res.status(200).json({ success: false, authenticated: false });
+    }
+  }
+
+  static async logout(req: Request, res: Response) {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+      if (refreshToken) {
+        await AuthService.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error('[Auth Error - Logout]:', error);
+    } finally {
+      res.clearCookie('refreshToken', getCookieOptions());
+      return res.status(200).json({ success: true });
     }
   }
 }

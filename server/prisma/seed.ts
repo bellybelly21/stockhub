@@ -35,17 +35,19 @@ async function main() {
   // Crear o actualizar Usuario Administrador
   const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@stockhub.cl';
   const rawAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin123456!';
-  const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 10);
+  const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 12);
 
   const adminUser = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       password: hashedAdminPassword,
+      rut: '11111111-1',
       assignedWarehouseId: defaultWarehouse.id,
     },
     create: {
       email: adminEmail,
       name: 'Luis Miguel Gallego Basteri',
+      rut:'11111111-1',
       password: hashedAdminPassword,
       role: Role.ADMIN,
       isActive: true,
@@ -57,17 +59,19 @@ async function main() {
 
   // Crear o actualizar Usuario Vendedor
   const sellerEmail = 'vendedor@stockhub.cl';
-  const hashedSellerPassword = await bcrypt.hash('Vendedor123!', 10);
+  const hashedSellerPassword = await bcrypt.hash('Vendedor123!', 12);
 
   const sellerUser = await prisma.user.upsert({
     where: { email: sellerEmail },
     update: {
       password: hashedSellerPassword,
+      rut:'22222222-2',
       assignedWarehouseId: defaultWarehouse.id,
     },
     create: {
       email: sellerEmail,
       name: 'Juan Pérez (Vendedor)',
+      rut: '22222222-2',
       password: hashedSellerPassword,
       role: Role.VENDEDOR,
       isActive: true,

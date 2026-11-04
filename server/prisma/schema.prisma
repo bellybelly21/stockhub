@@ -43,12 +43,14 @@ enum AdjustmentReason {
 
 model User {
   id                  String     @id @default(uuid())
+  rut                 String     @unique 
   email               String     @unique
   name                String
   password            String     // Hash bcrypt
   role                Role
-  isActive            Boolean    @default(true) // Baja lógica de usuario
+  isActive            Boolean    @default(true) 
   
+  // Opcional en BD, pero obligatorio por código para Vendedores y Bodegueros
   assignedWarehouse   Warehouse? @relation("UserAssignedWarehouse", fields: [assignedWarehouseId], references: [id])
   assignedWarehouseId String?
   

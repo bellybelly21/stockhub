@@ -34,11 +34,29 @@ export class UserController {
 
   static async update(req: Request, res: Response) {
     try {
-      const { id } = req.params as {id: string};
+      const { id } = req.params as { id: string };
       const user = await UserService.updateUser(id, req.body);
       return res.status(200).json({
         success: true,
         message: 'Usuario actualizado correctamente',
+        data: user,
+      });
+    } catch (error: any) {
+      if (error.message.includes('no encontrado')) {
+        return res.status(404).json({ success: false, error: error.message });
+      }
+      console.error('[UserController Error]:', error);
+      return res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+  }
+
+  static async toggleStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+      const user = await UserService.toggleUserStatus(id);
+      return res.status(200).json({
+        success: true,
+        message: `Estado del usuario actualizado a ${user.isActive ? 'Activo' : 'Inactivo'}`,
         data: user,
       });
     } catch (error: any) {

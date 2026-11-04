@@ -4,16 +4,19 @@
   --font-sans: 'Inter', sans-serif;
   /* Neutros y Fondos */
   --color-white: #ffffff;
-  --color-canvas: #f2f5fa;       /* El bg principal de la app */
-  --color-surface: #f7fafc;      /* Superficies de cards/tablas */
-  --color-dark: #0f1729;         /* Títulos / Texto principal */
+  --color-canvas: #f2f5fa;
+  --color-surface: #F1F5F9;
+  --color-dark: #1E293B;         /* Títulos / Texto principal */
+  --color-dark-different: #374151; /* Textos en inputs */
   --color-slate-dark: #1f293b;   /* Sidebar / Encabezados */
   --color-slate-mid: #63738c;    /* Texto secundario */
   --color-slate-light: #94a3b8;  /* Bordes / Placeholders */
+  --color-dark-bright: #B3D2FE;  /* Texto en fondo oscuro */
+  --color-light-gray: #D1D5DB;   /* Bordes de inputs */
 
   /* Marca / Acción Principal */
   --color-primary: #2663eb;      /* Botones y acentos principales */
-  --color-primary-hover: #3b82f5;/* Hover de botones */
+  --color-primary-hover: #1447e6;/* Hover de botones */
 
   /* Estados y Alertas */
   --color-accent: #eb590d;       /* Destacados / Badges / Advertencia */

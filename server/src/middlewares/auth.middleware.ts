@@ -4,20 +4,25 @@ import { Role } from '@prisma/client';
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
+  
+  // Validación estricta del formato Bearer
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Acceso denegado: Token no proporcionado o formato inválido' });
+  }
+
+  const token = authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Acceso denegado: Token no proporcionado' });
+    return res.status(401).json({ success: false, error: 'Acceso denegado: Token malformado' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as {
       id: string;
       role: Role;
       warehouseId?: string | null;
     };
     
-    // Inyectamos el payload seguro en la request
     req.user = {
       id: decoded.id,
       role: decoded.role,
@@ -25,7 +30,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     };
     next();
   } catch (error) {
-    return res.status(403).json({ success: false, error: 'Token inválido o expirado' });
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado' });
   }
 };
 
