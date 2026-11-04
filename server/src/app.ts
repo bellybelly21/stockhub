@@ -17,9 +17,23 @@ const app = express();
 app.set('trust proxy', 1); // Permite leer la IP real del usuario en Railway
 app.use(helmet());
 
+// Lista de orígenes permitidos
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://stockhub-erp.up.railway.app',
+  process.env.FRONTEND_URL, // Permite inyectar la URL desde Railway
+].filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://stockhub-project.up.railway.app', 'https://stockhub-erp.up.railway.app'],
+  origin: (origin, callback) => {
+    // Permite peticiones sin origin (como Postman o curl) o peticiones desde dominios autorizados
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origen ${origin} no permitido por CORS`));
+    }},
   methods: ['GET', 'POST', 'PUT', 'PATCH'], 
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
 
