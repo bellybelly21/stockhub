@@ -3,8 +3,10 @@ import { AuthService } from '../services/auth.service';
 
 const getCookieOptions = () => ({
   httpOnly: true,
-  secure: true, 
-  sameSite: 'none' as const, 
+  // En producción (Railway) será true, en local será false
+  secure: process.env.NODE_ENV === 'production',
+  // En producción necesita 'none' para cross-domain, en local usa 'lax'
+  sameSite: process.env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
 });
 
 export class AuthController {
