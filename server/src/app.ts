@@ -18,7 +18,7 @@ app.set('trust proxy', 1); // Permite leer la IP real del usuario en Railway
 app.use(helmet());
 
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://stockhub-project.up.railway.app'], // Removido el Regex inseguro
+  origin: ['http://localhost:5173', 'https://stockhub-project.up.railway.app', 'https://stockhub-erp.up.railway.app'],
   methods: ['GET', 'POST', 'PUT', 'PATCH'], 
   credentials: true,
 }));
