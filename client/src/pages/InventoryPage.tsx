@@ -37,9 +37,7 @@ function InventoryView() {
   };
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 lg:p-8 font-sans">
-      {/* Main Content Wrapper */}
-      <section className="max-w-7xl mx-auto flex flex-col gap-6">
+      <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12">
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="mb-6 flex justify-between items-center">
@@ -147,8 +145,7 @@ function InventoryView() {
                     <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Producto</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Marca</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Bodega</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider text-right">Stock Actual</th>
-                    <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider text-right">Stock Crítico</th>
+                    <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider text-right">Stock</th>
                     <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Estado</th>
                   </tr>
                 </thead>
@@ -178,7 +175,6 @@ function InventoryView() {
                           <td className={`py-4 px-6 text-sm font-bold text-right ${isCritical ? 'text-danger' : 'text-success'}`}>
                             {item.stock}
                           </td>
-                          <td className="py-4 px-6 text-sm text-slate-mid text-right">{item.criticalStock}</td>
                           <td className="py-4 px-6 text-sm">{getStatusBadge(item.status)}</td>
                         </tr>
                       );
@@ -201,7 +197,6 @@ function InventoryView() {
           </div>
         </div>
       </section>
-    </main>
   );
 }
 

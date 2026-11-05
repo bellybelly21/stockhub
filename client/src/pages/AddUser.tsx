@@ -126,7 +126,7 @@ export default function AddUser() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7F9] py-10 px-4 sm:px-6 flex flex-col items-center">
+    <section className="items-center justify-center flex">
       <div className="max-w-150 w-full">
         
         {/* Encabezado */}
@@ -146,7 +146,7 @@ export default function AddUser() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="mb-12">
           {/* Tarjeta del Formulario */}
           <div className="bg-white p-6 sm:p-8 rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex flex-col gap-5">
             
@@ -306,6 +306,6 @@ export default function AddUser() {
         </form>
 
       </div>
-    </div>
+    </section>
   );
 }

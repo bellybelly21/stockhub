@@ -97,8 +97,8 @@ export default function UsersPage() {
   });
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 lg:p-8 font-sans text-dark">
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+
+      <div className="max-w-7xl mx-auto flex flex-col gap-6  mb-12">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6!">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Gestión de trabajadores</h1>
@@ -218,6 +218,5 @@ export default function UsersPage() {
           )}
         </div>
       </div>
-    </main>
   );
 }
