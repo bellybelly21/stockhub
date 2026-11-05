@@ -2,22 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        warehouseId: string | null;
-        role: Role;
-      };
-    }
-  }
-}
-
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   
-  // Validación estricta del formato Bearer
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, error: 'Acceso denegado: Token no proporcionado o formato inválido' });
   }
@@ -29,16 +16,17 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as {
+    // al hacer el login firma el token con 'assignedWarehouseId'
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
       id: string;
       role: Role;
-      warehouseId?: string | null;
+      assignedWarehouseId?: string | null;
     };
     
     req.user = {
       id: decoded.id,
       role: decoded.role,
-      warehouseId: decoded.warehouseId || null,
+      assignedWarehouseId: decoded.assignedWarehouseId || null,
     };
     next();
   } catch (error) {

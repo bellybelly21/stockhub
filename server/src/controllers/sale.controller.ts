@@ -1,13 +1,15 @@
 import { Request, Response } from 'express';
 import { SaleService } from '../services/sale.service';
 import { CreateSaleInput } from '../schemas/sale.schema';
+import { AuthenticatedRequest } from '../types/express';
 
 export class SaleController {
 
   static async create(req: Request, res: Response) {
     try {
-      const sellerId = req.user!.id;
-      const warehouseId = req.user!.warehouseId;
+      const authReq = req as AuthenticatedRequest;
+      const sellerId = authReq.user!.id;
+      const warehouseId = authReq.user!.assignedWarehouseId;
       const saleData: CreateSaleInput = req.body;
       const idempotencyKey = req.headers['idempotency-key'] as string;
 

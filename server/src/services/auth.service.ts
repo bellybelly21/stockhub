@@ -24,18 +24,16 @@ export class AuthService {
     return { accessToken, rawRefreshToken, EIGHT_HOURS_MS };
   }
 
+  static async login(email: string, password: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    // Prevención de ataques de enumeración por tiempo
+    const DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstholaaaastockhub123445_678uuuuuuu';
+    const passwordToCompare = user ? user.password : DUMMY_HASH;
+    
+    const isPasswordValid = await bcrypt.compare(password, passwordToCompare);
 
-static async login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  const DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstholaaaastockhub123445_678uuuuuuu';
-
-  const passwordToCompare = user ? user.password : DUMMY_HASH;
-  const isPasswordValid = await bcrypt.compare(password, passwordToCompare);
-
-  if (!user || !user.isActive || !isPasswordValid) {
-    throw new Error('Credenciales inválidas');
-  }
-    if (!isPasswordValid) {
+    if (!user || !user.isActive || !isPasswordValid) {
       throw new Error('Credenciales inválidas');
     }
 
@@ -64,8 +62,13 @@ static async login(email: string, password: string) {
 
     if (!storedToken) throw new Error('Token no encontrado');
 
-    // Prevención de reuso de tokens
-    if (storedToken.isRevoked) {
+    // Ventana de gracia de 10 segundos para concurrencia o StrictMode
+    const GRACE_PERIOD_MS = 10 * 1000;
+    const isRecentlyRevoked = storedToken.isRevoked && 
+      (Date.now() - new Date(storedToken.createdAt).getTime() < GRACE_PERIOD_MS);
+
+    // Prevención de reuso de tokens 
+    if (storedToken.isRevoked && !isRecentlyRevoked) {
       await prisma.refreshToken.updateMany({
         where: { userId: storedToken.userId, isRevoked: false },
         data: { isRevoked: true },
@@ -77,11 +80,13 @@ static async login(email: string, password: string) {
       throw new Error('Token expirado o usuario inactivo');
     }
 
-    // Rotación del token usado
-    await prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { isRevoked: true },
-    });
+    // Rotación del token usado 
+    if (!storedToken.isRevoked) {
+      await prisma.refreshToken.update({
+        where: { id: storedToken.id },
+        data: { isRevoked: true },
+      });
+    }
 
     const tokens = await this.generateTokens(storedToken.user);
 

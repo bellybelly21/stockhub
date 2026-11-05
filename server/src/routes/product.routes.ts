@@ -17,7 +17,5 @@ router.get('/', ProductController.getAll);
 router.post('/', requireRole([Role.ADMIN, Role.BODEGUERO]), validateSchema(createProductSchema), ProductController.create);
 router.patch('/:id', requireRole([Role.ADMIN, Role.BODEGUERO]), validateSchema(updateProductSchema), ProductController.update);
 
-// DELETE: solo admin
-router.delete('/:id', requireAuth, requireRole([Role.ADMIN]), ProductController.delete);
 
 export default router;

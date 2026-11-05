@@ -13,4 +13,14 @@ export class WarehouseController {
       return res.status(500).json({ success: false, error: 'Error al crear la bodega' });
     }
   }
+  
 }
+
+export const getActiveWarehouses = async (_req: Request, res: Response) => {
+  const warehouses = await prisma.warehouse.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, location: true },
+    orderBy: { name: 'asc' },
+  });
+  return res.json({ success: true, data: warehouses });
+};

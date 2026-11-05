@@ -1,4 +1,5 @@
 import { prisma } from '../db/client';
+import { ProductStatus } from '@prisma/client';
 import { CreateProductInput, UpdateProductInput } from '../schemas/product.schema';
 
 export class ProductService {
@@ -51,11 +52,14 @@ export class ProductService {
       },
     });
   }
-
+  
   static async deactivateProduct(id: string) {
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) throw new Error('Producto no encontrado');
+  
     return await prisma.product.update({
       where: { id },
-      data: { isActive: false },
+      data: { status: ProductStatus.INACTIVO },
     });
   }
 }

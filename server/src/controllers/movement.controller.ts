@@ -1,102 +1,74 @@
 import { Request, Response } from 'express';
 import { prisma } from '../db/client';
+import { Prisma } from '@prisma/client';
+import { AuthenticatedRequest } from '../types/express';
 
 export const createMovement = async (req: Request, res: Response): Promise<any> => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user?.id;
+
   const { type, quantity, productId, fromWarehouseId, toWarehouseId, reason, comment } = req.body;
-  const userId = req.user!.id; 
+
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Usuario no autenticado' });
+  }
+
+  const numericQuantity = new Prisma.Decimal(quantity);
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      
-      // Lógica para salidas (MERMA, AJUSTE, DONACION)
-      if (['MERMA', 'AJUSTE', 'DONACION'].includes(type)) {
-        const currentStock = await tx.stock.findUnique({
+
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Validar y descontar origen (Salidas y Transferencias)
+      if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA'].includes(type)) {
+        const originStock = await tx.stock.findUnique({
           where: { productId_warehouseId: { productId, warehouseId: fromWarehouseId } }
         });
 
-        if (!currentStock || currentStock.quantity.toNumber() < quantity) {
-          // Lanzar un Error cancela toda la transacción
-          throw new Error('Stock insuficiente en la bodega de origen');
+        if (!originStock || originStock.quantity.lessThan(numericQuantity)) {
+          throw new Error(`INSUFFICIENT_STOCK:${originStock ? originStock.quantity.toString() : '0'}`);
         }
 
         await tx.stock.update({
-          where: { id: currentStock.id },
-          data: { quantity: { decrement: quantity } }
+          where: { id: originStock.id },
+          data: { quantity: { decrement: numericQuantity } }
         });
       }
 
-      // Lógica para INGRESO
-      if (type === 'INGRESO') {
+      // Incrementar destino (Ingresos y Transferencias)
+      if (['INGRESO', 'TRANSFERENCIA'].includes(type)) {
         await tx.stock.upsert({
           where: { productId_warehouseId: { productId, warehouseId: toWarehouseId } },
-          update: { quantity: { increment: quantity } },
-          create: { productId, warehouseId: toWarehouseId, quantity }
+          update: { quantity: { increment: numericQuantity } },
+          create: { productId, warehouseId: toWarehouseId, quantity: numericQuantity }
         });
       }
 
-      // Lógica de TRANSFERENCIA
-
-    if (type === 'TRANSFERENCIA') {
-    if (!fromWarehouseId || !toWarehouseId) {
-      throw new Error('La transferencia requiere una bodega de origen y una de destino');
-    }
-    if (fromWarehouseId === toWarehouseId) {
-      throw new Error('La bodega de origen y destino no pueden ser la misma');
-    }
-  
-    // Validar disponibilidad estricta en bodega de origen
-    const originStock = await tx.stock.findUnique({
-      where: {
-        productId_warehouseId: { productId, warehouseId: fromWarehouseId }
-      }
-    });
-  
-    if (!originStock || Number(originStock.quantity) < quantity) {
-      throw new Error(`Stock insuficiente en bodega de origen. Disponible: ${originStock ? originStock.quantity : 0}`);
-    }
-  
-    // Descontar stock de la bodega origen
-    await tx.stock.update({
-      where: {
-        productId_warehouseId: { productId, warehouseId: fromWarehouseId }
-      },
-      data: { quantity: { decrement: quantity } }
-    });
-  
-    // Sumar stock en la bodega destino (creando el registro si no existe)
-    await tx.stock.upsert({
-      where: {
-        productId_warehouseId: { productId, warehouseId: toWarehouseId }
-      },
-      update: { quantity: { increment: quantity } },
-      create: { productId, warehouseId: toWarehouseId, quantity }
-    });
-  }
-
-      // Registrar el movimiento histórico
-      const movement = await tx.movement.create({
+      // Registrar auditoría de movimiento
+      return await tx.movement.create({
         data: {
           type,
-          quantity,
+          quantity: numericQuantity,
           productId,
-          userId: req.user!.id,
-          fromWarehouseId: type === 'TRANSFERENCIA' || type === 'MERMA' ? fromWarehouseId : null,
-          toWarehouseId: type === 'TRANSFERENCIA' || type === 'INGRESO' ? toWarehouseId : null,
-          reason,
-          comment,
+          userId,
+          fromWarehouseId: ['TRANSFERENCIA', 'MERMA', 'AJUSTE', 'DONACION'].includes(type) ? fromWarehouseId : null,
+          toWarehouseId: ['TRANSFERENCIA', 'INGRESO'].includes(type) ? toWarehouseId : null,
+          reason: reason || null,
+          comment: comment || null,
         },
       });
-
-      return movement;
     });
 
     return res.status(201).json({ success: true, data: result });
   } catch (error: any) {
-    // Interceptamos el error específico que lanzamos arriba
-    if (error.message === 'Stock insuficiente en la bodega de origen') {
-      return res.status(400).json({ success: false, error: error.message });
+    if (typeof error.message === 'string' && error.message.startsWith('INSUFFICIENT_STOCK')) {
+      const available = error.message.split(':')[1];
+      return res.status(400).json({ 
+        success: false, 
+        error: `Stock insuficiente en la bodega de origen. Disponible: ${available}` 
+      });
     }
-    
-    return res.status(500).json({ success: false, error: 'Error procesando el movimiento', details: error.message });
+
+    console.error('[Movement Error]:', error);
+    return res.status(500).json({ success: false, error: 'Error interno al procesar el movimiento' });
   }
 };

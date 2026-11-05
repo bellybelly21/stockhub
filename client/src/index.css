@@ -22,4 +22,5 @@
   --color-accent: #eb590d;       /* Destacados / Badges / Advertencia */
   --color-danger: #db2626;       /* Errores / Mermas / Bajas */
   --color-success-bg: #dbfce8;   /* Fondo verde claro para badges de stock OK */
+  --color-success: #16A34A; /* Color de texto verde de éxito*/
 }
