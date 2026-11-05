@@ -4,6 +4,7 @@ import Login from './Login'
 import ProtectedRoute from './components/ProtectedRoute';
 import UsersPage from './pages/UsersPage';
 import AddUser from './pages/AddUser';
+import InventoryPage from './pages/InventoryPage';
 
 function App() {
   return (
@@ -19,10 +20,10 @@ function App() {
           <Route path="/users/edit" element={<ProtectedRoute allowedRoles={['ADMIN']}><AddUser /></ProtectedRoute>} />
 
           {/* Rutas exclusivas para BODEGUERO */}
-          <Route path="/inventario" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-8">Vista de Inventario (Bodeguero)</div></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><InventoryPage /> </ProtectedRoute>} />
 
           {/* Rutas exclusivas para VENDEDOR */}
-          <Route path="/ventas" element={<ProtectedRoute allowedRoles={['VENDEDOR', 'ADMIN']}><div className="p-8">Vista de Ventas (Vendedor)</div></ProtectedRoute>} />
+          <Route path="/sales" element={<ProtectedRoute allowedRoles={['VENDEDOR', 'ADMIN']}><div className="p-8">Vista de Ventas (Vendedor)</div></ProtectedRoute>} />
 
         </Routes>
       </AuthProvider>

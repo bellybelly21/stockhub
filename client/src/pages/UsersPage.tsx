@@ -97,7 +97,7 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="min-h-screen bg-canvas px-4 py-6 lg:p-8 font-sans text-dark">
+    <main className="min-h-screen bg-canvas px-4 py-6 lg:p-8 font-sans text-dark">
       <div className="max-w-7xl mx-auto flex flex-col gap-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6!">
           <div>
@@ -170,7 +170,7 @@ export default function UsersPage() {
                     <tr key={user.id} className="hover:bg-canvas/60 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white bg-gradient-to-br from-blue-600 to-purple-600">
+                          <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white bg-linear-to-br from-blue-600 to-purple-600">
                             {getInitials(user.name)}
                           </div>
                           <div className="flex flex-col">
@@ -218,6 +218,6 @@ export default function UsersPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
