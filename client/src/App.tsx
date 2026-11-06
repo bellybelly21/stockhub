@@ -6,6 +6,8 @@ import MainLayout from './components/MainLayout';
 import UsersPage from './pages/UsersPage';
 import AddUser from './pages/AddUser';
 import InventoryPage from './pages/InventoryPage';
+import AddProduct from './pages/AddProduct';
+import ProductsPage from './pages/ProductsPage';
 
 function App() {
   return (
@@ -45,9 +47,32 @@ function App() {
                 <InventoryPage />
               </ProtectedRoute>
             } />
+
+            <Route path="/products/add" element={
+              <ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}>
+                <AddProduct />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/products" element={
+              <ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}>
+                <ProductsPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/products/view/:id" element={
+              <ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}>
+                <AddProduct />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/products/edit/:id" element={
+              <ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}>
+                <AddProduct />
+              </ProtectedRoute>
+            } />
             
             {/* Ejemplos de rutas pendientes */}
-            <Route path="/products" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Productos</div></ProtectedRoute>} />
             <Route path="/inbound" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Entradas</div></ProtectedRoute>} />
             <Route path="/warehouses" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Bodegas</div></ProtectedRoute>} />
             <Route path="/transfers" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Transferencias</div></ProtectedRoute>} />

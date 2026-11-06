@@ -33,6 +33,16 @@ export class ProductService {
     });
   }
 
+  static async getProductById(id: string) {
+    const product = await prisma.product.findUnique({ 
+      where: { id } 
+    });
+    
+    if (!product) throw new Error('Producto no encontrado');
+    
+    return product;
+  }
+
   static async updateProduct(id: string, data: UpdateProductInput) {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error('Producto no encontrado');

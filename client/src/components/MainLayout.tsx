@@ -47,6 +47,7 @@ export default function MainLayout() {
     DASHBOARD: { title: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     INVENTARIO: { title: 'Inventario', path: '/inventory', icon: Package },
     PRODUCTOS: { title: 'Productos', path: '/products', icon: PackageOpen },
+    AGREGARPRODUCTO: { title: 'Agregar producto', path: '/products/add', icon: PackageOpen },
     ENTRADAS: { title: 'Entrada de mercancía', path: '/inbound', icon: Truck },
     VENTAS: { title: 'Ventas', path: '/sales', icon: ShoppingCart },
     BODEGAS: { title: 'Bodegas', path: '/warehouses', icon: Warehouse },
@@ -54,6 +55,7 @@ export default function MainLayout() {
     STOCK_CRITICO: { title: 'Stock crítico', path: '/critical-stock', icon: AlertTriangle },
     REPORTES: { title: 'Reportes', path: '/reports', icon: BarChart2 },
     USUARIOS: { title: 'Usuarios', path: '/users', icon: Users },
+    AGREGARUSUARIO: { title: 'Usuarios', path: '/users/add', icon: Users },
   };
 
   // Filtrar menú según Rol
@@ -82,6 +84,28 @@ export default function MainLayout() {
   };
 
   const menuItems = getMenuItems();
+
+  // Diccionario para mapear los paths
+  const routeNames: Record<string, string> = {
+    '': 'Inicio',
+    'dashboard': 'Dashboard',
+    'inventory': 'Inventario',
+    'products': 'Productos',
+    'products/add': 'Agregar producto',
+    'inbound': 'Entrada de Mercancía',
+    'sales': 'Ventas',
+    'warehouses': 'Bodegas',
+    'transfers': 'Transferencias',
+    'critical-stock': 'Stock Crítico',
+    'reports': 'Reportes',
+    'users': 'Usuarios',
+    'users/add': 'Crear usuario',
+  };
+
+  const fullPath = location.pathname.substring(1);
+  const baseSegment = fullPath.split('/')[0];
+  
+  const breadcrumbName = routeNames[fullPath] || routeNames[baseSegment] || 'Sección Desconocida';
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -134,7 +158,7 @@ export default function MainLayout() {
                     `}
                     onClick={() => window.innerWidth < 768 && setIsMobileOpen(false)}
                   >
-                    <item.icon size={20} className="flex-shrink-0" />
+                    <item.icon size={20} className="shrink-0" />
                     <span className={`ml-3 text-sm font-medium whitespace-nowrap transition-opacity duration-300 ${isCollapsed && !isMobileOpen ? 'opacity-0 hidden' : 'opacity-100'}`}>
                       {item.title}
                     </span>
@@ -167,7 +191,7 @@ export default function MainLayout() {
               ${isCollapsed && !isMobileOpen ? 'justify-center' : 'justify-start'}
             `}
           >
-            <LogOut size={20} className="flex-shrink-0" />
+            <LogOut size={20} className="shrink-0" />
             <span className={`ml-3 text-sm font-medium whitespace-nowrap ${isCollapsed && !isMobileOpen ? 'hidden' : 'block'}`}>
               Cerrar sesión
             </span>
@@ -179,7 +203,7 @@ export default function MainLayout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
         {/* TOP NAVBAR */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-12 shrink-0">
           
           {/* Toggles y Breadcrumb */}
           <div className="flex items-center gap-4">
@@ -203,8 +227,8 @@ export default function MainLayout() {
             <div className="hidden sm:flex items-center text-sm">
               <span className="text-slate-light">Sistema</span>
               <span className="mx-2 text-light-gray">/</span>
-              <span className="font-medium text-dark-different capitalize">
-                {location.pathname.split('/')[1] || 'Inicio'}
+              <span className="font-medium text-dark-different">
+                {breadcrumbName}
               </span>
             </div>
           </div>

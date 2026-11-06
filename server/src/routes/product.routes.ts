@@ -12,6 +12,7 @@ router.use(requireAuth);
 
 // GET: Disponible para todos los roles (Admin, Bodeguero, Vendedor)
 router.get('/', ProductController.getAll);
+router.get('/:id', ProductController.getById);
 
 // POST / PATCH: Solo Admin y Bodeguero
 router.post('/', requireRole([Role.ADMIN, Role.BODEGUERO]), validateSchema(createProductSchema), ProductController.create);
