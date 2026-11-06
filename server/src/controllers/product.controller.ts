@@ -23,6 +23,20 @@ export class ProductController {
     }
   }
 
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params as { id: string };
+      const product = await ProductService.getProductById(id);
+      
+      return res.status(200).json({ success: true, data: product });
+    } catch (error: any) {
+      if (error.message.includes('no encontrado')) {
+        return res.status(404).json({ success: false, error: error.message });
+      }
+      return res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+  }
+
   static async update(req: Request, res: Response) {
     try {
       const { id } = req.params as { id: string };

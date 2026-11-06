@@ -1,9 +1,12 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { X, Eye, EyeOff, AlertCircle, CheckCircle2, UserPlus, Info } from 'lucide-react';
+import { X, AlertCircle, CheckCircle2, UserPlus, Info } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { type Role, type CreateUserData, type User } from '../types/user';
 import { validateRun, formatRun } from '../utils/run';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 
 export default function AddUser() {
   const { accessToken } = useAuth();
@@ -15,7 +18,6 @@ export default function AddUser() {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -125,20 +127,26 @@ export default function AddUser() {
     if (formErrors.run) setFormErrors({ ...formErrors, run: '' });
   };
 
+  const warehouseOptions = [
+    { value: '', label: 'Seleccione una Bodega' },
+    ...warehouses.map(wh => ({ value: wh.id, label: wh.name }))
+  ];
+
   return (
     <section className="items-center justify-center flex">
-      <div className="max-w-150 w-full">
+      <div className="max-w-xl w-full">
         
         {/* Encabezado */}
         <div className="mb-6">
-          <h1 className="text-[28px] font-bold text-[#111827]">
-            {isEdit ? 'Editar trabajador' : 'Crear trabajador'}
+          <h1 className="text-[28px] font-bold text-gray-900">
+            {isEdit ? 'Editar usuario' : 'Crear usuario'}
           </h1>
-          <p className="text-slate-500 mt-1 text-[15px]">
-            {isEdit ? 'Actualice los datos del usuario en el sistema' : 'Cree nuevos usuarios para el sistema'}
+          <p className="text-gray-500 mt-1 text-[15px]">
+            {isEdit ? 'Actualice los datos del usuario en el sistema' : 'Crea nuevos usuarios para el sistema'}
           </p>
         </div>
 
+        {/* Feedback Banner */}
         {feedback && (
           <div className={`mb-6 p-4 rounded-xl border flex items-center gap-3 text-sm ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
             {feedback.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -148,160 +156,110 @@ export default function AddUser() {
 
         <form onSubmit={handleSubmit} className="mb-12">
           {/* Tarjeta del Formulario */}
-          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex flex-col gap-5">
+          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-5">
             
-            {/* Nombre Completo */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                Nombre completo <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="text" 
-                required 
-                value={formData.name} 
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                placeholder="Ej: Ana Torres" 
-                className="px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-gray-400" 
-              />
-              {formErrors.name && <span className="text-xs text-red-500">{formErrors.name}</span>}
-            </div>
+            <Input
+              label="Nombre completo"
+              required
+              placeholder="Ej: Ana Torres"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              error={formErrors.name}
+            />
 
-            {/* RUN */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                RUN <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="text" 
-                required 
-                disabled={isEdit} 
-                value={formData.run} 
-                onChange={handleRunChange} 
-                placeholder="10.123.456-7" 
-                className="px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors disabled:bg-gray-50 disabled:text-gray-500 placeholder:text-gray-400" 
-              />
-              {formErrors.run && <span className="text-xs text-red-500">{formErrors.run}</span>}
-            </div>
+            <Input
+              label="RUN"
+              required
+              disabled={isEdit}
+              placeholder="10.123.456-7"
+              value={formData.run}
+              onChange={handleRunChange}
+              error={formErrors.run}
+            />
 
-            {/* Correo Electrónico */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                Correo electrónico <span className="text-red-500">*</span>
-              </label>
-              <input 
-                type="email" 
-                required 
-                disabled={isEdit} 
-                value={formData.email} 
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                placeholder="ana@empresa.cl" 
-                className="px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors disabled:bg-gray-50 disabled:text-gray-500 placeholder:text-gray-400" 
-              />
-              {formErrors.email && <span className="text-xs text-red-500">{formErrors.email}</span>}
-            </div>
+            <Input
+              label="Correo electrónico"
+              type="email"
+              required
+              disabled={isEdit}
+              placeholder="ana@empresa.cl"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              error={formErrors.email}
+            />
 
-            {/* Contraseña */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                {isEdit ? 'Nueva contraseña' : 'Contraseña inicial'} <span className="text-red-500">{!isEdit && '*'}</span>
-              </label>
-              <div className="relative">
-                <input 
-                  type={showPassword ? 'text' : 'password'} 
-                  required={!isEdit} 
-                  value={formData.password} 
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
-                  placeholder="Mínimo 8 caracteres"
-                  className="w-full px-4 py-2.5 pr-10 rounded-lg border border-gray-300 text-[15px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-gray-400" 
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {formErrors.password && <span className="text-xs text-red-500">{formErrors.password}</span>}
-            </div>
+            <Input
+              label={isEdit ? 'Nueva contraseña' : 'Contraseña inicial'}
+              type="password"
+              required={!isEdit}
+              placeholder="Mínimo 8 caracteres"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              error={formErrors.password}
+            />
 
-            {/* Confirmar Contraseña */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                Confirmar contraseña <span className="text-red-500">{(!isEdit || formData.password) && '*'}</span>
-              </label>
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                required={!isEdit || !!formData.password} 
-                value={formData.confirmPassword} 
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} 
-                placeholder="Repita la contraseña"
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-gray-400" 
-              />
-              {formErrors.confirmPassword && <span className="text-xs text-red-500">{formErrors.confirmPassword}</span>}
-            </div>
+            <Input
+              label="Confirmar contraseña"
+              type="password"
+              required={!isEdit || !!formData.password}
+              placeholder="Repita la contraseña"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              error={formErrors.confirmPassword}
+            />
 
-            {/* Rol Asignado */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] font-semibold text-gray-700">
-                Rol <span className="text-red-500">*</span>
-              </label>
-              <select 
-                value={formData.role} 
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as Role, assignedWarehouseId: '' })} 
-                className="px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white appearance-none transition-colors"
-                style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
-              >
-                <option value="VENDEDOR">Vendedor</option>
-                <option value="BODEGUERO">Bodeguero</option>
-                <option value="ADMIN">Administrador</option>
-              </select>
-            </div>
+            <Select
+              label="Rol"
+              required
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as Role, assignedWarehouseId: '' })}
+              options={[
+                { value: 'VENDEDOR', label: 'Vendedor' },
+                { value: 'BODEGUERO', label: 'Bodeguero' },
+                { value: 'ADMIN', label: 'Administrador' }
+              ]}
+            />
 
             {/* Cuadro de Información */}
-            <div className="bg-[#EFF6FF] text-[#2563EB] p-4 rounded-lg flex gap-3 items-start mt-1 border border-blue-100 flex-wrap sm:flex-nowrap">
+            <div className="bg-blue-50 text-blue-700 p-4 rounded-lg flex gap-3 items-start mt-1 border border-blue-100">
               <Info className="w-5 h-5 shrink-0 mt-0.5" />
               <p className="text-[14px] leading-snug font-medium">
                 Los permisos del usuario se asignarán automáticamente según el rol seleccionado.
               </p>
             </div>
 
-            {/* Bodega Asignada */}
+            {/* Bodega Asignada Condicional */}
             {(formData.role === 'VENDEDOR' || formData.role === 'BODEGUERO') && (
-              <div className="flex flex-col gap-1.5 mt-2">
-                <label className="text-[14px] font-semibold text-gray-700">
-                  Bodega Asignada <span className="text-red-500">*</span>
-                </label>
-                <select 
-                  value={formData.assignedWarehouseId || ''} 
-                  onChange={(e) => setFormData({ ...formData, assignedWarehouseId: e.target.value })} 
-                  className="px-4 py-2.5 rounded-lg border border-gray-300 text-[15px] text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white appearance-none transition-colors"
-                  style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}
-                >
-                  <option value="">-- Seleccione una Bodega --</option>
-                  {warehouses.map(wh => (
-                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                  ))}
-                </select>
-                {formErrors.warehouse && <span className="text-xs text-red-500">{formErrors.warehouse}</span>}
-              </div>
+              <Select
+                label="Bodega Asignada"
+                required
+                value={formData.assignedWarehouseId || ''}
+                onChange={(e) => setFormData({ ...formData, assignedWarehouseId: e.target.value })}
+                options={warehouseOptions}
+                error={formErrors.warehouse}
+              />
             )}
             
           </div>
 
           {/* Botones de Acción */}
           <div className="flex justify-end gap-3 mt-6">
-            <button 
+            <Button 
               type="button" 
-              onClick={() => navigate('/users')} 
-              className="px-5 py-2.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-[14px] font-medium text-gray-700 flex items-center gap-2 transition-colors shadow-sm"
+              variant="secondary" 
+              onClick={() => navigate('/users')}
+              leftIcon={<X className="w-4 h-4" />}
             >
-              <X className="w-4 h-4" /> Cancelar
-            </button>
-            <button 
+              Cancelar
+            </Button>
+            <Button 
               type="submit" 
-              disabled={isLoading} 
-              className="px-5 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white font-medium rounded-lg text-[14px] flex items-center gap-2 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              variant="primary" 
+              isLoading={isLoading}
+              leftIcon={!isLoading ? <UserPlus className="w-4 h-4" /> : undefined}
             >
-              <UserPlus className="w-4 h-4" />
-              {isLoading ? 'Guardando...' : (isEdit ? 'Actualizar usuario' : 'Crear usuario')}
-            </button>
+              {isEdit ? 'Actualizar usuario' : 'Crear usuario'}
+            </Button>
           </div>
         </form>
 

@@ -6,6 +6,10 @@ import {
 } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { type User, type Role } from '../types/user';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
 export default function UsersPage() {
   const { accessToken } = useAuth();
@@ -79,14 +83,18 @@ export default function UsersPage() {
     const date = new Date(dateString);
     return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
   };
-
+  
   const renderRoleBadge = (role: Role) => {
-    const badges = {
-      ADMIN: <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1E40AF]"><ShieldCheck className="w-3.5 h-3.5" /> Administrador</span>,
-      VENDEDOR: <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-[#F3E8FF] text-[#6B21A8]"><ShoppingBag className="w-3.5 h-3.5" /> Vendedor</span>,
-      BODEGUERO: <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-[#FFEDD5] text-[#9A3412]"><Warehouse className="w-3.5 h-3.5" /> Bodeguero</span>
-    };
-    return badges[role] || null;
+    switch (role) {
+      case 'ADMIN':
+        return <Badge variant="info" className="bg-[#DBEAFE] text-[#1E40AF]" icon={<ShieldCheck size={14} />}>Administrador</Badge>;
+      case 'VENDEDOR':
+        return <Badge variant="purple" icon={<ShoppingBag size={14} />}>Vendedor</Badge>;
+      case 'BODEGUERO':
+        return <Badge variant="warning" className="bg-[#FFEDD5] text-[#9A3412]" icon={<Warehouse size={14} />}>Bodeguero</Badge>;
+      default:
+        return null;
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -97,64 +105,81 @@ export default function UsersPage() {
   });
 
   return (
-
-      <div className="max-w-7xl mx-auto flex flex-col gap-6  mb-12">
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6!">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Gestión de trabajadores</h1>
-            <p className="text-slate-mid text-sm mt-1">Administra los usuarios del sistema y sus roles de acceso</p>
-          </div>
-          <button
-            onClick={() => navigate('/users/add')}
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary hover:bg-primary-hover text-white font-medium rounded-lg transition-colors cursor-pointer text-sm shrink-0"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Crear Usuario</span>
-          </button>
-        </header>
-
-        {feedback && (
-          <div className={`p-4 rounded-lg border flex items-center justify-between gap-3 text-sm ${feedback.type === 'success' ? 'bg-success-bg border-emerald-300 text-emerald-900' : 'bg-red-50 border-danger/30 text-danger'}`}>
-            <div className="flex items-center gap-2">
-              {feedback.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <AlertCircle className="w-5 h-5 text-danger" />}
-              <span className="font-medium">{feedback.message}</span>
-            </div>
-            <button onClick={() => setFeedback(null)} className="text-slate-mid hover:text-dark"><X className="w-4 h-4" /></button>
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div className="relative w-full sm:w-96">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-mid" />
-            <input
-              type="text" placeholder="Buscar por nombre o correo..."
-              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-light-gray rounded-lg text-dark-different text-sm focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <label className="text-xs font-semibold text-slate-mid uppercase tracking-wider shrink-0">Filtrar por Rol:</label>
-            <select
-              value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full sm:w-48 px-3 py-2.5 bg-white border border-light-gray rounded-lg text-sm focus:outline-none focus:border-primary"
-            >
-              <option value="ALL">Todos los roles</option>
-              <option value="ADMIN">Administrador</option>
-              <option value="VENDEDOR">Vendedor</option>
-              <option value="BODEGUERO">Bodeguero</option>
-            </select>
-          </div>
+    <div className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
+      
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Gestión de usuarios</h1>
+          <p className="text-slate-mid text-sm mt-1">Administra los usuarios del sistema y sus roles de acceso</p>
         </div>
+        <Button 
+          variant="primary"
+          leftIcon={<Plus className="w-5 h-5" />}
+          onClick={() => navigate('/users/add')}
+          className="w-full sm:w-auto"
+        >
+          Crear Usuario
+        </Button>
+      </header>
 
-        <div className="bg-surface rounded-lg border border-light-gray overflow-hidden">
-          {isLoading ? (
-            <div className="p-12 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-mid text-sm">Cargando nómina de usuarios...</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+      {/* Feedback Alert */}
+      {feedback && (
+        <div className={`p-4 rounded-lg border flex items-center justify-between gap-3 text-sm ${feedback.type === 'success' ? 'bg-success-bg border-emerald-300 text-emerald-900' : 'bg-red-50 border-danger/30 text-danger'}`}>
+          <div className="flex items-center gap-2">
+            {feedback.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <AlertCircle className="w-5 h-5 text-danger" />}
+            <span className="font-medium">{feedback.message}</span>
+          </div>
+          <button onClick={() => setFeedback(null)} className="text-slate-mid hover:text-dark transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Filtros utilizando el UI Kit */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-end sm:items-center">
+        <div className="w-full sm:w-96">
+          <Input
+            placeholder="Buscar por nombre o correo..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            startIcon={<Search size={16} />}
+          />
+        </div>
+        
+        <div className="md:w-fit w-full flex items-center gap-2">
+           <label className="text-xs font-semibold text-slate-mid uppercase tracking-wider shrink-0 hidden sm:block">
+            Filtrar por Rol:
+          </label>
+          <Select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            options={[
+              { value: 'ALL', label: 'Todos los roles' },
+              { value: 'ADMIN', label: 'Administrador' },
+              { value: 'VENDEDOR', label: 'Vendedor' },
+              { value: 'BODEGUERO', label: 'Bodeguero' }
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="bg-surface rounded-lg border border-light-gray overflow-hidden">
+        {isLoading ? (
+          <div className="p-12 flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-mid text-sm">Cargando nómina de usuarios...</p>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="p-12 text-center text-slate-mid text-sm">
+            No se encontraron usuarios que coincidan con la búsqueda.
+          </div>
+        ) : (
+          <>
+            {/* Vista Desktop/Tablet (Tabla) */}
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border-collapse hidden md:table">
                 <thead>
                   <tr className="bg-[#F8FAFC] text-[#64748B] text-xs font-semibold tracking-wider uppercase border-b border-light-gray">
                     <th className="py-4 px-6">Usuario</th>
@@ -165,12 +190,12 @@ export default function UsersPage() {
                     <th className="py-4 px-6">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y bg-white divide-light-gray/40 text-sm">
+                <tbody className="divide-y divide-light-gray bg-white text-sm">
                   {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-canvas/60 transition-colors">
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white bg-linear-to-br from-blue-600 to-purple-600">
+                          <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white bg-linear-to-br from-primary to-purple-600">
                             {getInitials(user.name)}
                           </div>
                           <div className="flex flex-col">
@@ -183,31 +208,35 @@ export default function UsersPage() {
                       <td className="py-4 px-6">{renderRoleBadge(user.role)}</td>
                       <td className="py-4 px-6">
                         {user.isActive ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-success-bg text-emerald-800">Activo</span>
+                          <Badge variant="success">Activo</Badge>
                         ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-danger">Inactivo</span>
+                          <Badge variant="danger">Inactivo</Badge>
                         )}
                       </td>
                       <td className="py-4 px-6 text-xs text-slate-mid">
                         {user.createdAt ? formatDate(user.createdAt) : '-'}
                       </td>
-                      <td className="py-4 px-6 text-right">
-                        <div className="flex items-start justify-start gap-2">
-                          <button
+                      <td className="py-4 px-6">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Edit2 size={14} />}
+                            className="border border-gray-200 text-primary hover:bg-primary/5"
                             onClick={() => navigate('/users/edit', { state: { user } })}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] border border-[#E2E8F0] text-primary hover:bg-primary/5 transition-colors text-xs font-medium"
                           >
-                            <Edit2 className="w-3.5 h-3.5" /> Editar
-                          </button>
-                          <button
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<Users size={14} />}
+                            isLoading={actionLoadingId === user.id}
+                            className={`border border-gray-200 ${user.isActive ? 'text-danger hover:bg-red-50' : 'text-success hover:bg-emerald-50'}`}
                             onClick={() => handleToggleStatus(user)}
-                            disabled={actionLoadingId === user.id}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[5px] border border-[#E2E8F0] transition-colors text-xs font-medium ${
-                              user.isActive ? 'text-danger hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'
-                            }`}
                           >
-                            <Users className="w-3.5 h-3.5" /> {user.isActive ? 'Desactivar' : 'Activar'}
-                          </button>
+                            {user.isActive ? 'Desactivar' : 'Activar'}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -215,8 +244,72 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+
+            {/* Vista Mobile (Tarjetas) */}
+            <div className="flex flex-col divide-y divide-light-gray bg-white md:hidden">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="p-4 flex flex-col gap-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex justify-between items-start gap-2 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white bg-linear-to-br from-blue-600 to-purple-600">
+                        {getInitials(user.name)}
+                      </div>
+                      <div className="flex flex-col shrink">
+                        <span className="font-semibold text-dark leading-tight">{user.name}</span>
+                        <span className="text-sm text-slate-mid mt-0.5">{user.email}</span>
+                      </div>
+                    </div>
+                    <div>
+                    {user.isActive ? (
+                      <Badge variant="success">Activo</Badge>
+                    ) : (
+                      <Badge variant="danger">Inactivo</Badge>
+                    )}
+                    </div>
+                    
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-sm flex-wrap gap-4">
+                    {renderRoleBadge(user.role)}
+                    <span className="text-xs text-slate-mid">
+                      Creado en:
+                      {user.createdAt ? formatDate(user.createdAt) : '-'}
+                    </span>
+                  </div>
+                  
+                  {user.assignedWarehouse && (
+                    <div className="text-xs text-slate-mid bg-slate-50 px-2 py-1.5 rounded self-start">
+                      Sede: {user.assignedWarehouse.name}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2 mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Edit2 size={14} />}
+                      className="border border-gray-200 text-primary hover:bg-primary/5 w-full"
+                      onClick={() => navigate('/users/edit', { state: { user } })}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Users size={14} />}
+                      isLoading={actionLoadingId === user.id}
+                      className={`border border-gray-200 w-full ${user.isActive ? 'text-danger hover:bg-red-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                      onClick={() => handleToggleStatus(user)}
+                    >
+                      {user.isActive ? 'Desactivar' : 'Activar'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
+    </div>
   );
 }
