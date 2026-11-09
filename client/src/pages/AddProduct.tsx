@@ -106,7 +106,7 @@ export default function ProductForm() {
 
     try {
       const parsedBasePrice = parseInt(formData.basePrice, 10);
-      const parsedCriticalStock = parseInt(formData.criticalStock, 10);
+      const parsedCriticalStock = parseFloat(formData.criticalStock);
 
       if (isNaN(parsedBasePrice)) throw new Error('El precio base debe ser un número válido.');
 
@@ -238,7 +238,7 @@ export default function ProductForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-dark mb-1.5">Stock crítico <span className="text-danger">*</span></label>
-                <Input name="criticalStock" type="number" step="1" min="0" value={formData.criticalStock} onChange={handleChange} required disabled={isViewMode} />
+                <Input name="criticalStock" type="number" step="0.001" min="0" value={formData.criticalStock} onChange={handleChange} required disabled={isViewMode} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-dark mb-1.5">Precio Base <span className="text-danger">*</span></label>
@@ -250,6 +250,7 @@ export default function ProductForm() {
                   options={[
                     { value: 'ACTIVO', label: 'Activo' },
                     { value: 'EN_OFERTA', label: 'En Oferta' },
+                    { value: 'DONADO', label: 'Donado' },
                     { value: 'INACTIVO', label: 'Inactivo' },
                   ]}
                 />

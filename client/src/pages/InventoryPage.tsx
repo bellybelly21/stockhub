@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Filter, RefreshCw, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useInventory, InventoryProvider } from '../context/InventoryContext';
 import type { ProductStatus } from '../types/inventory';
 import { Input } from '../components/ui/Input';
@@ -22,6 +22,22 @@ function InventoryView() {
     fetchInventory,
   } = useInventory();
 
+  // === ESTADOS DE PAGINACIÓN ===
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Si los filtros cambian, volvemos a la página 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedWarehouse, selectedStatus]);
+
+  // Cálculos de paginación
+  const totalItems = inventory.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInventory = inventory.slice(startIndex, startIndex + itemsPerPage);
+  // ============================
+
   const getStatusBadge = (status: ProductStatus) => {
     switch (status) {
       case 'ACTIVO':
@@ -40,7 +56,6 @@ function InventoryView() {
     fetchInventory();
   };
 
-  // Preparar opciones para los Selects del UI Kit
   const warehouseOptions = [
     { value: 'Todas', label: 'Todas las bodegas' },
     ...warehouses.map((wh) => ({ value: wh.id, label: wh.name }))
@@ -53,9 +68,17 @@ function InventoryView() {
     { value: 'INACTIVO', label: 'Inactivo' }
   ];
 
+  // Auto-refresh cada 15 segundos
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchInventory();
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchInventory]);
+
   return (
     <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
-      {/* Page Content */}
       <div className="flex-1 overflow-y-auto">
         
         {/* Header */}
@@ -65,17 +88,17 @@ function InventoryView() {
             <p className="text-slate-mid mt-1 text-sm">Consulta el stock actualizado de todos los productos</p>
           </div>
           <Button
-  variant="ghost"
-  onClick={() => fetchInventory()}
-  disabled={loading}
-  className="h-10 w-10 !p-0 shrink-0 border border-light-gray text-slate-600"
-  title="Actualizar tabla"
->
-  <RefreshCw size={18} />
-</Button>
+            variant="ghost"
+            onClick={() => fetchInventory()}
+            disabled={loading && inventory.length === 0} 
+            className="h-10 w-10 !p-0 shrink-0 border border-light-gray text-slate-600"
+            title="Actualizar tabla"
+          >
+            <RefreshCw size={18} />
+          </Button>
         </header>
 
-        {/* Módulo de Filtros */}
+        {/* Filtros */}
         <form 
           onSubmit={handleSearchSubmit} 
           className="bg-white rounded-xl border border-light-gray p-4 lg:p-6 mb-6 flex flex-col md:flex-row gap-4 items-end"
@@ -118,19 +141,18 @@ function InventoryView() {
             <Button
               type="submit"
               variant="primary"
-              disabled={loading}
+              disabled={loading && inventory.length === 0} 
               leftIcon={<Filter size={16} />}
               className="w-full md:w-auto"
             >
-              {loading ? 'Buscando...' : 'Filtrar'}
+              {loading && inventory.length === 0 ? 'Cargando...' : 'Filtrar'}
             </Button>
           </div>
         </form>
 
-        {/* Módulo de la Tabla y Tarjetas Mobile */}
+        {/* Tabla */}
         <div className="bg-surface rounded-xl border border-light-gray overflow-hidden">
           
-          {/* Banner de Error */}
           {error && (
             <div className="p-4 bg-red-50 border-b border-red-200 text-danger text-sm font-medium flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -152,7 +174,7 @@ function InventoryView() {
             </div>
           ) : (
             <>
-              {/* Vista Desktop/Tablet (Tabla) */}
+              {/* Vista Desktop */}
               <div className="overflow-x-auto w-full">
                 <table className="w-full text-left border-collapse hidden md:table">
                   <thead>
@@ -167,7 +189,7 @@ function InventoryView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-light-gray bg-white text-sm">
-                    {inventory.map((item, index) => {
+                    {paginatedInventory.map((item, index) => {
                       const isCritical = item.stock <= item.criticalStock;
                       return (
                         <tr key={`${item.sku}-${item.warehouse}-${index}`} className="hover:bg-slate-50 transition-colors">
@@ -189,9 +211,9 @@ function InventoryView() {
                 </table>
               </div>
 
-              {/* Vista Mobile (Tarjetas) */}
+              {/* Vista Mobile */}
               <div className="flex flex-col divide-y divide-light-gray bg-white md:hidden">
-                {inventory.map((item, index) => {
+                {paginatedInventory.map((item, index) => {
                   const isCritical = item.stock <= item.criticalStock;
                   return (
                     <div key={`${item.sku}-${item.warehouse}-${index}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors">
@@ -228,17 +250,30 @@ function InventoryView() {
           )}
 
           {/* Footer / Pagination */}
-          <div className="p-4 lg:p-6 border-t border-light-gray bg-white flex flex-col sm:flex-row items-center justify-between text-sm text-slate-mid gap-4">
-            <div className="font-medium">{inventory.length} productos encontrados</div>
-            <div className="flex items-center space-x-4">
-              <span>Página 1 de 1</span>
-              <div className="flex space-x-1">
-                <button className="w-8 h-8 flex items-center justify-center bg-primary text-white rounded-md font-medium transition-colors hover:bg-primary/90">
-                  1
-                </button>
+          {totalItems > 0 && (
+            <div className="p-4 lg:p-6 border-t border-light-gray bg-white flex flex-col sm:flex-row items-center justify-between text-sm text-slate-mid gap-4">
+              <div className="font-medium">{totalItems} productos encontrados</div>
+              <div className="flex items-center space-x-4">
+                <span>Página {currentPage} de {totalPages}</span>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-3 flex items-center justify-center bg-white border border-light-gray text-slate-600 rounded-md font-medium transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-3 flex items-center justify-center bg-white border border-light-gray text-slate-600 rounded-md font-medium transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
           
         </div>
       </div>

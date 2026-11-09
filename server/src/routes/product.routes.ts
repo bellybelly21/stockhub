@@ -10,12 +10,11 @@ const router = Router();
 // Todas las rutas requieren autenticación
 router.use(requireAuth);
 
-// GET: Disponible para todos los roles (Admin, Bodeguero, Vendedor)
+router.get('/search', ProductController.searchByCode);
 router.get('/', ProductController.getAll);
-router.get('/:id', ProductController.getById);
-
-// POST / PATCH: Solo Admin y Bodeguero
 router.post('/', requireRole([Role.ADMIN, Role.BODEGUERO]), validateSchema(createProductSchema), ProductController.create);
+
+router.get('/:id', ProductController.getById);
 router.patch('/:id', requireRole([Role.ADMIN, Role.BODEGUERO]), validateSchema(updateProductSchema), ProductController.update);
 
 

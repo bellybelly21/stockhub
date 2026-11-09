@@ -1,29 +1,29 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Plus, Eye, Edit2, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { 
+  Plus, 
+  Eye, 
+  Edit2, 
+  RefreshCw, 
+  AlertCircle, 
+  X, 
+  PackageMinus 
+} from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
-
-interface Product {
-  id: string;
-  sku: string;
-  barcode: string;
-  name: string;
-  brand: string;
-  supplier: string;
-  unitOfMeasure: string;
-  status: 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO';
-}
+import OutboundStockModal from './OutboundStockModal';
+import type { Product, Warehouse } from './OutboundStockModal';
 
 export default function ProductsPage() {
   const navigate = useNavigate();
   const { accessToken } = useAuth();
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estados para el Modal de Cambio de Estado
+  // Estado del Modal de Cambio de Estado
   const [statusModal, setStatusModal] = useState<{ isOpen: boolean; productId: string | null; currentStatus: string }>({
     isOpen: false,
     productId: null,
@@ -31,32 +31,27 @@ export default function ProductsPage() {
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  // Estado del Modal de Decremento Excepcional
+  const [outboundModal, setOutboundModal] = useState<{ isOpen: boolean; productId?: string }>({
+    isOpen: false,
+    productId: undefined
+  });
+
   const fetchProducts = async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(`${API_URL}/api/products`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
+        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || 'Error al cargar los productos');
 
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Error al cargar los productos');
-      }
-
-      let productsArray = [];
-      if (Array.isArray(data)) {
-        productsArray = data; 
-      } else if (data && Array.isArray(data.products)) {
-        productsArray = data.products; 
-      } else if (data && Array.isArray(data.data)) {
-        productsArray = data.data; 
-      } else {
-        throw new Error('El formato de datos devuelto por el servidor no es válido.');
-      }
+      let productsArray: Product[] = [];
+      if (Array.isArray(data)) productsArray = data;
+      else if (data && Array.isArray(data.products)) productsArray = data.products;
+      else if (data && Array.isArray(data.data)) productsArray = data.data;
 
       setProducts(productsArray);
     } catch (err: any) {
@@ -66,17 +61,28 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchWarehouses = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/warehouses`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      const data = await response.json();
+      if (response.ok && data.data) setWarehouses(data.data);
+    } catch (err) {
+      console.error('Error al obtener bodegas:', err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchWarehouses();
   }, []);
 
-  // Función para guardar el nuevo estado
   const handleUpdateStatus = async (newStatus: 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO') => {
     if (!statusModal.productId) return;
     
     setIsUpdatingStatus(true);
     try {
-      // Ajusta la ruta y método (PATCH o PUT) según la configuración de tu API
       const response = await fetch(`${API_URL}/api/products/${statusModal.productId}`, {
         method: 'PATCH', 
         headers: {
@@ -91,10 +97,7 @@ export default function ProductsPage() {
         throw new Error(errorData.message || 'Error al actualizar el estado');
       }
 
-      // Actualizar el estado local para no recargar toda la lista
       setProducts(prev => prev.map(p => p.id === statusModal.productId ? { ...p, status: newStatus } : p));
-      
-      // Cerrar modal
       setStatusModal({ isOpen: false, productId: null, currentStatus: '' });
     } catch (err: any) {
       alert(err.message || 'Ocurrió un problema al cambiar el estado');
@@ -130,17 +133,29 @@ export default function ProductsPage() {
           <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Productos</h1>
           <p className="text-slate-mid mt-1 text-sm">Catálogo de productos registrados en el sistema</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => navigate('/products/add')}
-          leftIcon={<Plus size={18} />}
-          className="shrink-0"
-        >
-          Nuevo producto
-        </Button>
+        
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap lg:flex-row">
+          <Button
+            variant="ghost"
+            onClick={() => setOutboundModal({ isOpen: true })}
+            leftIcon={<PackageMinus size={18} className="text-black" />}
+            className="border-gray-500 border hover:bg-rose-50 hover:border-rose-300 w-full sm:w-auto font-medium"
+          >
+            Decremento excepcional
+          </Button>
+
+          <Button
+            variant="primary"
+            onClick={() => navigate('/products/add')}
+            leftIcon={<Plus size={18} />}
+            className="shrink-0 w-full sm:w-auto"
+          >
+            Nuevo producto
+          </Button>
+        </div>
       </header>
 
-      {/* Contenedor Principal */}
+      {/* Contenedor Tabla */}
       <div className="bg-white rounded-xl border border-light-gray overflow-hidden shadow-sm">
         
         {error && (
@@ -180,7 +195,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-light-gray bg-white text-sm">
-                {products.map((product) => (
+                  {products.map((product) => (
                     <tr key={product.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-6 text-slate-mid font-mono text-xs">{product.sku}</td>
                       <td className="py-4 px-6 text-slate-light font-mono text-xs">{product.barcode}</td>
@@ -219,7 +234,7 @@ export default function ProductsPage() {
 
             {/* Vista Mobile */}
             <div className="flex flex-col divide-y divide-light-gray bg-white md:hidden">
-            {products.map((product) => (
+              {products.map((product) => (
                 <div key={product.id} className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex flex-col">
@@ -258,6 +273,7 @@ export default function ProductsPage() {
                       >
                         <RefreshCw size={16} />
                       </button>
+
                     </div>
                   </div>
                 </div>
@@ -267,7 +283,7 @@ export default function ProductsPage() {
         )}
       </div>
 
-      {/* Modal de Estado */}
+      {/* Modal Cambio de Estado */}
       {statusModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border border-light-gray">
@@ -323,6 +339,16 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Decremento Excepcional */}
+      <OutboundStockModal
+        isOpen={outboundModal.isOpen}
+        onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
+        products={products}
+        warehouses={warehouses}
+        initialProductId={outboundModal.productId}
+        onSuccess={fetchProducts}
+      />
 
     </section>
   );
