@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
 import { Scan, ArrowLeft, ArrowRight, CheckCircle2, Package, AlertCircle, Check } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Input } from '../components/ui/Input';
@@ -26,7 +25,6 @@ interface EntryResult {
 }
 
 export default function MerchandiseEntryPage() {
-  const navigate = useNavigate();
   const { accessToken } = useAuth();
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const [warehouses, setWarehouses] = useState<{id: string, name: string}[]>([]);

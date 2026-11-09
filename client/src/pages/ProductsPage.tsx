@@ -7,8 +7,7 @@ import {
   RefreshCw, 
   AlertCircle, 
   X, 
-  PackageMinus, 
-  TrendingDown 
+  PackageMinus 
 } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
