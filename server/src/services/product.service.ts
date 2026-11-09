@@ -107,18 +107,7 @@ export class ProductService {
   static async updateProduct(id: string, data: UpdateProductInput) {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error('Producto no encontrado');
-
-    let newSku = product.sku;
-
-    // Lógica para agregar o quitar el sufijo "-don" según el estado
-    if (data.status !== undefined) {
-      if (data.status === ProductStatus.DONADO && !newSku.endsWith('-don')) {
-        newSku = `${newSku}-don`;
-      } else if (data.status !== ProductStatus.DONADO && newSku.endsWith('-don')) {
-        newSku = newSku.replace('-don', '');
-      }
-    }
-
+  
     return await prisma.product.update({
       where: { id },
       data: {
@@ -131,7 +120,6 @@ export class ProductService {
         ...(data.basePrice !== undefined && { basePrice: data.basePrice }),
         ...(data.criticalStock !== undefined && { criticalStock: data.criticalStock }),
         ...(data.status !== undefined && { status: data.status }),
-        sku: newSku, 
       },
     });
   }

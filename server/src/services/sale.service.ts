@@ -9,7 +9,7 @@ export class SaleService {
     data: CreateSaleInput,
     idempotencyKey: string
   ) {
-    // 1. Verificar si esta petición ya se procesó con éxito
+    // Verificar si esta petición ya se procesó con éxito
     const existingSale = await prisma.sale.findUnique({
       where: { idempotencyKey },
       include: { details: true }
@@ -19,7 +19,7 @@ export class SaleService {
     const MAX_RETRIES = 3;
     let attempt = 0;
 
-    // 2. Bucle de reintentos para manejar Deadlocks de PostgreSQL
+    // Bucle de reintentos para manejar Deadlocks de PostgreSQL
     while (attempt < MAX_RETRIES) {
       try {
         return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -27,7 +27,7 @@ export class SaleService {
           const saleDetails = [];
           const movements = [];
 
-          // 3. Inicio del bucle sobre cada item de la venta
+          // Inicio del bucle sobre cada item de la venta
           for (const item of data.items) {
             
             // Obtener el producto para validar el precio
@@ -85,31 +85,44 @@ export class SaleService {
               fromWarehouseId: warehouseId,
             });
           }
+// Calcular el total acumulando los items 
+const totalAmount = data.items.reduce((acc, item) => {
+  const itemSubtotal = new Prisma.Decimal(item.expectedPrice).times(item.quantity);
+  return acc.plus(itemSubtotal);
+}, new Prisma.Decimal(0));
 
-          // 4. Crear la Venta, Detalles y Movimientos en una sola operación
-          return await tx.sale.create({
-            data: {
-              total: totalSale,
-              sellerId,
-              warehouseId, 
-              idempotencyKey,
-              details: { create: saleDetails },
-              movements: { create: movements },
-            },
-            include: { details: true },
-          });
-        });
-      } catch (error: any) {
-        // Manejo del Deadlock
-        if (error.code === '40P01' && attempt < MAX_RETRIES - 1) {
-          attempt++;
-          // Espera aleatoria entre 50ms y 150ms para desempatar transacciones
-          await new Promise((res) => setTimeout(res, 50 + Math.random() * 100));
-          continue;
-        }
-        // Si no es un deadlock o superamos los reintentos, lanzamos el error al Controller
-        throw error;
-      }
-    }
+// Desglosar Neto e IVA usando 'totalAmount'
+const netAmount = totalAmount.dividedBy(1.19);
+const taxAmount = totalAmount.minus(netAmount);
+
+return await tx.sale.create({
+            
+  data: {
+    total: totalAmount,
+    sellerId,
+    warehouseId, 
+    idempotencyKey,
+    netAmount,
+    taxAmount,
+    details: { create: saleDetails },
+    movements: { create: movements },
+  },
+  include: { details: true },
+});
+});
+} catch (error: any) {
+// Manejo del Deadlock
+if (error.code === '40P01' && attempt < MAX_RETRIES - 1) {
+attempt++;
+// Espera aleatoria entre 50ms y 150ms para desempatar transacciones
+await new Promise((res) => setTimeout(res, 50 + Math.random() * 100));
+continue;
+}
+
+throw error;
+}
+};
+          
+    
   }
 }
