@@ -14,10 +14,23 @@ export class ProductController {
     }
   }
 
-  static async getAll(_req: Request, res: Response) {
+  static async getAll(req: Request, res: Response) {
     try {
-      const products = await ProductService.getAllProducts();
-      return res.status(200).json({ success: true, data: products });
+      const { limit, cursor, search, status, warehouseId } = req.query;
+
+      const result = await ProductService.getProducts({
+        limit: limit ? Number(limit) : 20,
+        cursor: cursor as string,
+        search: search as string,
+        status: status as any,
+        warehouseId: warehouseId as string,
+      });
+
+      return res.status(200).json({ 
+        success: true, 
+        data: result.data,
+        nextCursor: result.nextCursor 
+      });
     } catch (error) {
       return res.status(500).json({ success: false, error: 'Error interno del servidor' });
     }
@@ -50,7 +63,6 @@ export class ProductController {
     }
   }
 
-  // Método integrado a la clase y delegado al servicio
   static async delete(req: Request, res: Response) {
     try {
       const { id } = req.params as { id: string };
@@ -63,6 +75,26 @@ export class ProductController {
       });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: 'Error al desactivar el producto' });
+    }
+  }
+
+  static async searchByCode(req: Request, res: Response) {
+    try {
+      const { code, warehouseId } = req.query;
+  
+      if (!code) {
+        return res.status(400).json({ success: false, error: 'Código de barras o SKU requerido' });
+      }
+  
+      const product = await ProductService.findByCodeOrSku(String(code), String(warehouseId || ''));
+  
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Producto no encontrado en el catálogo' });
+      }
+  
+      return res.status(200).json({ success: true, data: product });
+    } catch (error) {
+      return res.status(500).json({ success: false, error: 'Error interno al buscar el producto' });
     }
   }
 }

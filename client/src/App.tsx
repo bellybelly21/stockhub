@@ -8,6 +8,7 @@ import AddUser from './pages/AddUser';
 import InventoryPage from './pages/InventoryPage';
 import AddProduct from './pages/AddProduct';
 import ProductsPage from './pages/ProductsPage';
+import MovementsPage from './pages/MovementsPage';
 
 function App() {
   return (
@@ -71,9 +72,14 @@ function App() {
                 <AddProduct />
               </ProtectedRoute>
             } />
+
+            <Route path="/movements" element={
+              <ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}>
+                <MovementsPage />
+              </ProtectedRoute>
+            } />
             
             {/* Ejemplos de rutas pendientes */}
-            <Route path="/inbound" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Entradas</div></ProtectedRoute>} />
             <Route path="/warehouses" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Bodegas</div></ProtectedRoute>} />
             <Route path="/transfers" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg shadow-sm border border-slate-200">Transferencias</div></ProtectedRoute>} />
             

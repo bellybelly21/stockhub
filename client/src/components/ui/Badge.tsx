@@ -1,6 +1,6 @@
 interface BadgeProps {
   children?: React.ReactNode;
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple';
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple' | 'orange';
   icon?: React.ReactNode;
   className?: string;
 }
@@ -12,7 +12,8 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'neutral', ico
     danger: "bg-red-100 text-red-800",
     info: "bg-blue-100 text-blue-800",
     neutral: "bg-gray-100 text-gray-700",
-    purple: "bg-[#F3E8FF] text-[#6B21A8]"
+    purple: "bg-[#F3E8FF] text-[#6B21A8]",
+    orange: "bg-orange-100 text-orange-700"
   };
 
   return (
