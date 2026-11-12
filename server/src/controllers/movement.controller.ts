@@ -16,10 +16,9 @@ export const createMovement = async (req: Request, res: Response): Promise<any> 
   const numericQuantity = new Prisma.Decimal(quantity);
 
   try {
-
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Validar y descontar origen (Salidas y Transferencias)
-      if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA'].includes(type)) {
+      if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA'].includes(type)) {
         const originStock = await tx.stock.findUnique({
           where: { productId_warehouseId: { productId, warehouseId: fromWarehouseId } }
         });
@@ -35,7 +34,7 @@ export const createMovement = async (req: Request, res: Response): Promise<any> 
       }
 
       // Incrementar destino (Ingresos y Transferencias)
-      if (['INGRESO', 'TRANSFERENCIA'].includes(type)) {
+      if (['INGRESO', 'TRANSFERENCIA_SALIDA'].includes(type)) {
         await tx.stock.upsert({
           where: { productId_warehouseId: { productId, warehouseId: toWarehouseId } },
           update: { quantity: { increment: numericQuantity } },
@@ -50,8 +49,8 @@ export const createMovement = async (req: Request, res: Response): Promise<any> 
           quantity: numericQuantity,
           productId,
           userId,
-          fromWarehouseId: ['TRANSFERENCIA', 'MERMA', 'AJUSTE', 'DONACION'].includes(type) ? fromWarehouseId : null,
-          toWarehouseId: ['TRANSFERENCIA', 'INGRESO'].includes(type) ? toWarehouseId : null,
+          fromWarehouseId: ['TRANSFERENCIA_SALIDA', 'MERMA', 'AJUSTE', 'DONACION'].includes(type) ? fromWarehouseId : null,
+          toWarehouseId: ['TRANSFERENCIA_SALIDA', 'INGRESO'].includes(type) ? toWarehouseId : null,
           reason: reason || null,
           comment: comment || null,
         },

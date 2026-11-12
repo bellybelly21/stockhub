@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createMovementSchema = z.object({
   body: z.object({
-    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA']),
+    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA']),
     quantity: z.number().positive('La cantidad debe ser mayor a 0'),
     productId: z.string().uuid('El ID del producto es inválido'),
     fromWarehouseId: z.string().uuid('ID de bodega origen inválido').optional(),
@@ -10,8 +10,7 @@ export const createMovementSchema = z.object({
     reason: z.enum(['DANADO_RECEPCION', 'MERMA_FISICA', 'VENCIMIENTO', 'DONACION', 'OTRO']).optional(),
     comment: z.string().min(5, 'El comentario debe tener al menos 5 caracteres').optional(),
   }).superRefine((data, ctx) => {
-    // Validar Origen
-    if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA'].includes(data.type) && !data.fromWarehouseId) {
+    if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA'].includes(data.type) && !data.fromWarehouseId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Debe especificar la bodega de origen para este tipo de movimiento',
@@ -19,8 +18,7 @@ export const createMovementSchema = z.object({
       });
     }
 
-    // Validar Destino
-    if (['INGRESO', 'TRANSFERENCIA'].includes(data.type) && !data.toWarehouseId) {
+    if (['INGRESO', 'TRANSFERENCIA_SALIDA'].includes(data.type) && !data.toWarehouseId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Debe especificar la bodega de destino para este tipo de movimiento',
@@ -28,8 +26,7 @@ export const createMovementSchema = z.object({
       });
     }
 
-    // Validar Bodegas Idénticas
-    if (data.type === 'TRANSFERENCIA' && data.fromWarehouseId === data.toWarehouseId) {
+    if (data.type === 'TRANSFERENCIA_SALIDA' && data.fromWarehouseId === data.toWarehouseId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'La bodega de origen y destino no pueden ser la misma',
@@ -37,7 +34,6 @@ export const createMovementSchema = z.object({
       });
     }
 
-    // Validar Justificación
     if (['MERMA', 'AJUSTE'].includes(data.type) && !data.reason) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -6,20 +6,27 @@ import {
   Edit2, 
   RefreshCw, 
   AlertCircle, 
-  X, 
-  PackageMinus 
+  X 
 } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
-import OutboundStockModal from './OutboundStockModal';
-import type { Product, Warehouse } from './OutboundStockModal';
+
+export interface Product {
+  id: string;
+  sku: string;
+  barcode: string;
+  name: string;
+  brand: string;
+  supplier: string;
+  unitOfMeasure: string;
+  status: string;
+}
 
 export default function ProductsPage() {
   const navigate = useNavigate();
   const { accessToken } = useAuth();
   
   const [products, setProducts] = useState<Product[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,12 +37,6 @@ export default function ProductsPage() {
     currentStatus: ''
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-
-  // Estado del Modal de Decremento Excepcional
-  const [outboundModal, setOutboundModal] = useState<{ isOpen: boolean; productId?: string }>({
-    isOpen: false,
-    productId: undefined
-  });
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -61,21 +62,8 @@ export default function ProductsPage() {
     }
   };
 
-  const fetchWarehouses = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/warehouses`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      const data = await response.json();
-      if (response.ok && data.data) setWarehouses(data.data);
-    } catch (err) {
-      console.error('Error al obtener bodegas:', err);
-    }
-  };
-
   useEffect(() => {
     fetchProducts();
-    fetchWarehouses();
   }, []);
 
   const handleUpdateStatus = async (newStatus: 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO') => {
@@ -125,7 +113,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
+    <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
       
       {/* Header */}
       <header className="mb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -135,15 +123,6 @@ export default function ProductsPage() {
         </div>
         
         <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap lg:flex-row">
-          <Button
-            variant="ghost"
-            onClick={() => setOutboundModal({ isOpen: true })}
-            leftIcon={<PackageMinus size={18} className="text-black" />}
-            className="border-gray-500 border hover:bg-rose-50 hover:border-rose-300 w-full sm:w-auto font-medium"
-          >
-            Decremento excepcional
-          </Button>
-
           <Button
             variant="primary"
             onClick={() => navigate('/products/add')}
@@ -156,7 +135,7 @@ export default function ProductsPage() {
       </header>
 
       {/* Contenedor Tabla */}
-      <div className="bg-white rounded-xl border border-light-gray overflow-hidden shadow-sm">
+      <div className="bg-white rounded-xl border border-light-gray overflow-hidden">
         
         {error && (
           <div className="p-4 bg-red-50 border-b border-red-200 text-danger text-sm font-medium flex justify-between items-center">
@@ -339,16 +318,6 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
-
-      {/* Modal Decremento Excepcional */}
-      <OutboundStockModal
-        isOpen={outboundModal.isOpen}
-        onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
-        products={products}
-        warehouses={warehouses}
-        initialProductId={outboundModal.productId}
-        onSuccess={fetchProducts}
-      />
 
     </section>
   );

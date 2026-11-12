@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, PackageMinus } from 'lucide-react';
 import { useInventory, InventoryProvider } from '../context/InventoryContext';
+import { useAuth, API_URL } from '../context/AuthContext';
 import type { ProductStatus } from '../types/inventory';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import OutboundStockModal from './OutboundStockModal';
+import type { Product } from './OutboundStockModal';
 
 function InventoryView() {
+  const { accessToken } = useAuth();
+  
   const {
     inventory,
     warehouses,
@@ -25,6 +30,37 @@ function InventoryView() {
   // === ESTADOS DE PAGINACIÓN ===
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // === ESTADOS PARA EL MODAL OUTBOUND ===
+  const [products, setProducts] = useState<Product[]>([]);
+  const [outboundModal, setOutboundModal] = useState<{ isOpen: boolean; productId?: string }>({
+    isOpen: false,
+    productId: undefined
+  });
+
+  // Cargar productos para el selector del Modal
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/products`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || 'Error al cargar los productos');
+
+      let productsArray: Product[] = [];
+      if (Array.isArray(data)) productsArray = data;
+      else if (data && Array.isArray(data.products)) productsArray = data.products;
+      else if (data && Array.isArray(data.data)) productsArray = data.data;
+
+      setProducts(productsArray);
+    } catch (err: any) {
+      console.error('Error al obtener productos para el modal:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   // Si los filtros cambian, volvemos a la página 1
   useEffect(() => {
@@ -78,24 +114,36 @@ function InventoryView() {
   }, [fetchInventory]);
 
   return (
-    <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
+    <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
       <div className="flex-1 overflow-y-auto">
         
         {/* Header */}
-        <header className="mb-6 flex justify-between items-start sm:items-center">
+        <header className="mb-6 flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Inventario</h1>
             <p className="text-slate-mid mt-1 text-sm">Consulta el stock actualizado de todos los productos</p>
           </div>
-          <Button
-            variant="ghost"
-            onClick={() => fetchInventory()}
-            disabled={loading && inventory.length === 0} 
-            className="h-10 w-10 !p-0 shrink-0 border border-light-gray text-slate-600"
-            title="Actualizar tabla"
-          >
-            <RefreshCw size={18} />
-          </Button>
+          
+          <div className="flex items-center flex-wrap sm:flex-nowrap gap-3 w-full sm:w-auto">
+            <Button
+              variant="ghost"
+              onClick={() => setOutboundModal({ isOpen: true })}
+              leftIcon={<PackageMinus size={18} className="text-black" />}
+              className="border-light-gray border hover:bg-rose-50 hover:border-rose-300 w-full sm:w-auto font-medium"
+            >
+              Decremento excepcional
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => fetchInventory()}
+              disabled={loading && inventory.length === 0} 
+              className="h-10 w-10 !p-0 shrink-0 border border-light-gray text-slate-600 w-full sm:w-10"
+              title="Actualizar tabla"
+            >
+              <RefreshCw size={18} />
+            </Button>
+          </div>
         </header>
 
         {/* Filtros */}
@@ -217,7 +265,7 @@ function InventoryView() {
                   const isCritical = item.stock <= item.criticalStock;
                   return (
                     <div key={`${item.sku}-${item.warehouse}-${index}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors">
-                      <div className="flex justify-between items-start gap-2">
+                      <div className="flex justify-between items-start gap-2 flex-wrap!">
                         <div className="flex flex-col">
                           <span className="font-bold text-dark leading-tight">{item.name}</span>
                           <span className="text-xs text-slate-mid mt-1">Marca: {item.brand}</span>
@@ -225,13 +273,13 @@ function InventoryView() {
                         <div className="shrink-0">{getStatusBadge(item.status)}</div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-mid font-mono bg-slate-50 p-2 rounded-md border border-light-gray">
+                      <div className="flex items-center gap-2 text-xs text-slate-mid font-mono bg-slate-50 p-2 rounded-md border border-light-gray flex-wrap">
                         <span>SKU: {item.sku}</span>
                         <span className="text-slate-300">|</span>
                         <span>{item.barcode}</span>
                       </div>
 
-                      <div className="flex justify-between items-center mt-1">
+                      <div className="flex justify-between items-center mt-1 flex-wrap! gap-3.5">
                         <span className="text-xs text-slate-mid bg-slate-100 px-2 py-1 rounded">
                           Bodega: {item.warehouse}
                         </span>
@@ -277,6 +325,16 @@ function InventoryView() {
           
         </div>
       </div>
+
+      {/* Modal Decremento Excepcional */}
+      <OutboundStockModal
+        isOpen={outboundModal.isOpen}
+        onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
+        products={products}
+        warehouses={warehouses}
+        initialProductId={outboundModal.productId}
+        onSuccess={fetchInventory} // Actualizamos el inventario cuando finaliza exitosamente
+      />
     </section>
   );
 }

@@ -3,8 +3,45 @@ import * as bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
+// Instanciamos la lista negra en memoria
+export const blacklistedUsers = new Set<string>();
+
 export class AuthService {
-  // Función auxiliar privada para evitar duplicar código
+  // Método para cargar usuarios inactivos al iniciar el servidor
+  static async initializeBlacklist() {
+    const inactiveUsers = await prisma.user.findMany({ 
+      where: { isActive: false }, 
+      select: { id: true } 
+    });
+    inactiveUsers.forEach(user => blacklistedUsers.add(user.id));
+  }
+
+  // El método que el Admin llamará para dar la baja inmediata
+  static async revokeUserAccess(userId: string) {
+    // Inactiva al usuario en la BD
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: false }
+    });
+
+    // Invalida todos sus Refresh Tokens (mata sesiones futuras)
+    await prisma.refreshToken.updateMany({
+      where: { userId, isRevoked: false },
+      data: { isRevoked: true }
+    });
+
+    // Agrega a la lista negra en memoria (mata Access Tokens activos instantáneamente)
+    blacklistedUsers.add(userId);
+  }
+
+  // Por si el Admin decide reactivar al trabajador
+  static async restoreUserAccess(userId: string) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: true }
+    });
+    blacklistedUsers.delete(userId);
+  }
   private static async generateTokens(user: any) {
     const accessToken = jwt.sign(
       { id: user.id, role: user.role, warehouseId: user.assignedWarehouseId },

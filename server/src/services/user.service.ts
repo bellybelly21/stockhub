@@ -2,10 +2,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../db/client';
 import { CreateUserInput, UpdateUserInput } from '../schemas/user.schema';
 import * as bcrypt from 'bcrypt';
+import { blacklistedUsers } from './auth.service';
 
 export class UserService {
   static async createUser(data: CreateUserInput) {
-    // Validar que el email o el RUT no existan previamente
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ email: data.email }, { rut: data.rut }],
@@ -88,11 +88,15 @@ export class UserService {
         },
       });
 
+      // MANTENEMOS SINCRONIZADA LA LISTA NEGRA AL ACTUALIZAR EL ESTADO
       if (data.isActive === false) {
         await tx.refreshToken.updateMany({
           where: { userId: id, isRevoked: false },
           data: { isRevoked: true },
         });
+        blacklistedUsers.add(id); // Bloqueo en memoria instantáneo
+      } else if (data.isActive === true) {
+        blacklistedUsers.delete(id); // Restauración en memoria instantánea
       }
 
       return updatedUser;
@@ -119,11 +123,15 @@ export class UserService {
         },
       });
 
+      // MANTENEMOS SINCRONIZADA LA LISTA NEGRA AL CAMBIAR ESTADO
       if (!newStatus) {
         await tx.refreshToken.updateMany({
           where: { userId: id, isRevoked: false },
           data: { isRevoked: true },
         });
+        blacklistedUsers.add(id); // Bloqueo en memoria instantáneo
+      } else {
+        blacklistedUsers.delete(id); // Restauración en memoria instantánea
       }
 
       return updatedUser;

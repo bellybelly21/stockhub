@@ -105,7 +105,7 @@ export default function UsersPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
+    <div className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
       
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">

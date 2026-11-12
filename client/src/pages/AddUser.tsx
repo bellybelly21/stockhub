@@ -156,7 +156,7 @@ export default function AddUser() {
 
         <form onSubmit={handleSubmit} className="mb-12">
           {/* Tarjeta del Formulario */}
-          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-5">
+          <div className="bg-white p-6 sm:p-8 rounded-xl  border border-gray-100 flex flex-col gap-5">
             
             <Input
               label="Nombre completo"
