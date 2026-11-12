@@ -15,22 +15,26 @@ async function main() {
   console.log('🌱 Iniciando la carga de seed idempotente para StockHub ERP...');
 
   // ================= BODEGAS =================
+  const BODEGA_CENTRAL_ID = '018f9b90-0000-7000-8000-000000000001';
+  const BODEGA_NORTE_ID = '018f9b90-0000-7000-8000-000000000002';
+  const BODEGA_SUR_ID = '018f9b90-0000-7000-8000-000000000003';
+
   const bodegaCentral = await prisma.warehouse.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000001' },
+    where: { id: BODEGA_CENTRAL_ID },
     update: { name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
-    create: { id: '00000000-0000-0000-0000-000000000001', name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
+    create: { id: BODEGA_CENTRAL_ID, name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
   });
 
   const bodegaNorte = await prisma.warehouse.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000002' },
+    where: { id: BODEGA_NORTE_ID },
     update: { name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
-    create: { id: '00000000-0000-0000-0000-000000000002', name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
+    create: { id: BODEGA_NORTE_ID, name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
   });
 
   const bodegaSur = await prisma.warehouse.upsert({
-    where: { id: '00000000-0000-0000-0000-000000000003' },
+    where: { id: BODEGA_SUR_ID },
     update: { name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
-    create: { id: '00000000-0000-0000-0000-000000000003', name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
+    create: { id: BODEGA_SUR_ID, name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
   });
 
   console.log(`✅ Bodegas listas: ${bodegaCentral.name}, ${bodegaNorte.name}, ${bodegaSur.name}`);

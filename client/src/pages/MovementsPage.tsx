@@ -175,7 +175,7 @@ export default function MerchandiseEntryPage() {
   };
 
   return (
-    <section className="max-w-4xl mx-auto flex flex-col gap-6 mb-12 px-4 sm:px-0">
+    <section className="max-w-4xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
       
       {/* Header Fijo */}
       <header className="mb-2">
@@ -193,7 +193,7 @@ export default function MerchandiseEntryPage() {
 
       {/* Ingreso de Código */}
       {step === 1 && (
-        <div className="bg-white rounded-xl border border-light-gray p-8 shadow-sm">
+        <div className="bg-white rounded-xl border border-light-gray p-8">
           <form onSubmit={handleSearchProduct} className="flex flex-col gap-6">
             
             <div>
@@ -246,7 +246,7 @@ export default function MerchandiseEntryPage() {
       {step === 2 && product && (
         <div className="flex flex-col gap-6">
           {/* Tarjeta de Información del Producto */}
-          <div className="bg-white rounded-xl border border-light-gray p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="bg-white rounded-xl border border-light-gray p-6  flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="bg-blue-50 p-4 rounded-xl text-primary shrink-0">
               <Package size={32} />
             </div>
@@ -280,7 +280,7 @@ export default function MerchandiseEntryPage() {
           </div>
 
           {/* Formulario de Cantidad */}
-          <div className="bg-white rounded-xl border border-light-gray p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-light-gray p-6 ">
             <form onSubmit={handleRegisterEntry} className="flex flex-col gap-6">
               <div>
                 <label className="block text-sm font-bold text-slate-dark mb-2">
@@ -332,8 +332,8 @@ export default function MerchandiseEntryPage() {
         <div className="flex flex-col gap-6">
           
           {/* Banner de Éxito */}
-          <div className="bg-[#dbfce8] border border-[#16A34A]/20 rounded-xl p-5 flex items-center gap-4 shadow-sm">
-            <div className="text-[#16A34A] bg-white rounded-full p-1 shadow-sm">
+          <div className="bg-[#dbfce8] border border-[#16A34A]/20 rounded-xl p-5 flex items-center gap-4 ">
+            <div className="text-[#16A34A] bg-white rounded-full p-1 ">
               <CheckCircle2 size={24} />
             </div>
             <div>
@@ -343,7 +343,7 @@ export default function MerchandiseEntryPage() {
           </div>
 
           {/* Tarjeta de Resumen */}
-          <div className="bg-white rounded-xl border border-light-gray p-8 shadow-sm text-center">
+          <div className="bg-white rounded-xl border border-light-gray p-8  text-center">
             <h2 className="text-lg font-bold text-dark text-left mb-6">{product.name}</h2>
             
             <div className="grid grid-cols-3 divide-x divide-light-gray mb-8">

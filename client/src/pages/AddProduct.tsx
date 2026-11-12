@@ -181,7 +181,7 @@ export default function ProductForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           
-          <div className="bg-white rounded-xl border border-light-gray p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-light-gray p-6">
             <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Identificación del producto</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -196,7 +196,7 @@ export default function ProductForm() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-light-gray p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-light-gray p-6">
             <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Información general</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 gap-y-5">
               <div>
@@ -233,7 +233,7 @@ export default function ProductForm() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-light-gray p-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-light-gray p-6 ">
             <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Control de stock y estado</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>

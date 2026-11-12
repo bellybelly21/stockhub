@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
+import { blacklistedUsers } from '../services/auth.service';
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -16,12 +17,19 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   }
 
   try {
-    // al hacer el login firma el token con 'assignedWarehouseId'
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
       id: string;
       role: Role;
       assignedWarehouseId?: string | null;
     };
+    
+    // VALIDACIÓN DE REVOCACIÓN INMEDIATA (BLACKLIST)
+    if (blacklistedUsers.has(decoded.id)) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Sesión revocada: Su acceso ha sido deshabilitado por un administrador.' 
+      });
+    }
     
     req.user = {
       id: decoded.id,
