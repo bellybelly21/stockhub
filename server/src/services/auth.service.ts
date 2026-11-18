@@ -44,7 +44,7 @@ export class AuthService {
   }
   private static async generateTokens(user: any) {
     const accessToken = jwt.sign(
-      { id: user.id, role: user.role, warehouseId: user.assignedWarehouseId },
+      { id: user.id, role: user.role, assignedWarehouseId: user.assignedWarehouseId },
       process.env.JWT_SECRET as string,
       { expiresIn: '15m' }
     );
