@@ -33,7 +33,7 @@ app.use(cors({
       callback(new Error(`Origen ${origin} no permitido por CORS`));
     }},
   methods: ['GET', 'POST', 'PUT', 'PATCH'], 
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization','Idempotency-Key'],
   credentials: true,
 }));
 
@@ -62,6 +62,11 @@ const loginLimiter = rateLimit({
 app.use('/api/auth/login', loginLimiter);
 
 // Rutas
+
+// Healthcheck público para monitoreo y pruebas de carga (JMeter)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 app.use('/api/sales', saleRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
