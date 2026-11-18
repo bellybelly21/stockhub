@@ -233,13 +233,13 @@ model Sale {
   id             String       @id @default(uuid(7))
   
   // Desglose tributario para Boleta / Factura Electrónica
-  netAmount      Decimal      @db.Decimal(12, 2) // Neto sin IVA
-  taxAmount      Decimal      @db.Decimal(12, 2) // IVA (19%)
+  netAmount      Decimal?      @db.Decimal(12, 2) // Neto sin IVA
+  taxAmount      Decimal?      @db.Decimal(12, 2) // IVA (19%)
   total          Decimal      @db.Decimal(12, 2) // Total abonado
 
   // PREPARADO PARA BOLETA ELECTRÓNICA Y FACTURACIÓN
-  documentType   DocumentType @default(TICKET_INTERNO)
-  taxStatus      TaxStatus    @default(PENDIENTE)
+  documentType   DocumentType? @default(TICKET_INTERNO)
+  taxStatus      TaxStatus?    @default(PENDIENTE)
   folio          Int?         // Número de boleta fiscal emitido
   customerRut    String?      // RUT del comprador para facturas/boletas nominativas
 

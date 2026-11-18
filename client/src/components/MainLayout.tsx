@@ -136,8 +136,8 @@ export default function MainLayout() {
             <Box size={24} />
           </div>
           <div className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isCollapsed && !isMobileOpen ? 'opacity-0 hidden' : 'opacity-100'}`}>
-            <p className="text-sm font-bold text-white leading-tight">Gestión de</p>
-            <p className="text-sm font-bold text-primary leading-tight">Inventario</p>
+            <p className="text-sm font-bold text-white leading-tight">StockHub</p>
+            <p className="text-sm font-bold text-primary leading-tight">ERP</p>
           </div>
         </div>
 

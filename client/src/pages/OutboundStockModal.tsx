@@ -157,7 +157,7 @@ export default function OutboundStockModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 sm:p-6">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] border border-light-gray flex flex-col overflow-hidden">
         
         {/* Cabecera Fija */}

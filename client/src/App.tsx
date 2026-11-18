@@ -10,6 +10,7 @@ import AddProduct from './pages/AddProduct';
 import ProductsPage from './pages/ProductsPage';
 import MovementsPage from './pages/MovementsPage';
 import TransferPage from './pages/TransferPage';
+import SalesPage from './pages/SalePage';
 
 function App() {
   return (
@@ -85,6 +86,12 @@ function App() {
                 <TransferPage />
               </ProtectedRoute>
             } />
+
+            <Route path="/sales" element={
+              <ProtectedRoute allowedRoles={['VENDEDOR', 'ADMIN']}>
+                <SalesPage />
+              </ProtectedRoute>
+            } />
             
             {/* Ejemplos de rutas pendientes */}
             <Route path="/warehouses" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Bodegas</div></ProtectedRoute>} />
@@ -92,11 +99,6 @@ function App() {
             <Route path="/critical-stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Stock Crítico</div></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute allowedRoles={['ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Reportes</div></ProtectedRoute>} />
 
-            <Route path="/sales" element={
-              <ProtectedRoute allowedRoles={['VENDEDOR', 'ADMIN']}>
-                <div className="p-8 bg-white rounded-lg  border border-slate-200">Vista de Ventas (Vendedor)</div>
-              </ProtectedRoute>
-            } />
             
           </Route>
         </Routes>

@@ -158,4 +158,47 @@ export class ProductService {
       stock: Number(currentStock)
     };
   }
+
+  static async validateSaleItems(
+    tx: Prisma.TransactionClient,
+    items: { productId: string; expectedPrice: number; quantity: number }[]
+  ) {
+    const productIds = items.map(i => i.productId);
+    
+    // Consulta en lote
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } }
+    });
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+    let totalAmount = new Prisma.Decimal(0);
+    const validatedItems = [];
+
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      
+      if (!product) {
+        throw new Error(`Producto no encontrado: ${item.productId}`);
+      }
+      if (product.status === 'INACTIVO') {
+        throw new Error(`El producto ${product.name} no está activo.`);
+      }
+      if (Number(product.basePrice) !== item.expectedPrice) {
+        throw new Error(`Mapeo de precio fallido para ${product.name}. Precio actual: ${product.basePrice}`);
+      }
+
+      const itemQuantity = new Prisma.Decimal(item.quantity);
+      const subtotal = itemQuantity.mul(product.basePrice);
+      totalAmount = totalAmount.add(subtotal);
+
+      validatedItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: product.basePrice,
+        subtotal: subtotal,
+      });
+    }
+
+    return { validatedItems, totalAmount };
+  }
 }

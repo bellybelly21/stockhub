@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../db/client';
 import { CreateSaleInput } from '../schemas/sale.schema';
+import { ProductService } from './product.service';
+import { StockService } from './stock.service';
 
 export class SaleService {
   static async processSale(
@@ -9,120 +11,63 @@ export class SaleService {
     data: CreateSaleInput,
     idempotencyKey: string
   ) {
-    // Verificar si esta petición ya se procesó con éxito
+    // Verificación de idempotencia fuera de la transacción para no bloquear recursos
     const existingSale = await prisma.sale.findUnique({
       where: { idempotencyKey },
       include: { details: true }
     });
     if (existingSale) return existingSale;
 
+    // ORDENAMIENTO LÉXICO (Lock Ordering) para prevenir Deadlocks 40P01
+    // Al bloquear las filas siempre en el mismo orden alfabético de IDs,
+    // es matemáticamente imposible que dos transacciones se bloqueen mutuamente.
+    const sortedItems = [...data.items].sort((a, b) => a.productId.localeCompare(b.productId));
+
     const MAX_RETRIES = 3;
     let attempt = 0;
 
-    // Bucle de reintentos para manejar Deadlocks de PostgreSQL
     while (attempt < MAX_RETRIES) {
       try {
         return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-          let totalSale = new Prisma.Decimal(0);
-          const saleDetails = [];
-          const movements = [];
-
-          // Inicio del bucle sobre cada item de la venta
-          for (const item of data.items) {
-            
-            // Obtener el producto para validar el precio
-            const product = await tx.product.findUnique({
-              where: { id: item.productId }
-            });
-
-            if (!product) {
-              throw new Error(`Producto no encontrado: ${item.productId}`);
-            }
-
-            // Verificar discrepancia de precios
-            if (Number(product.basePrice) !== item.expectedPrice) {
-              throw new Error(`Mapeo de precio fallido para ${product.name}. Precio actual es ${product.basePrice}`);
-            }
-
-            // Bloqueo de fila para concurrencia extrema (FOR UPDATE)
-            const stocks = await tx.$queryRawUnsafe<Array<{ id: string; quantity: Prisma.Decimal }>>(
-              'SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE',
-              item.productId,
-              warehouseId
-            );
-
-            // Validar stock disponible
-            const stock = stocks[0];
-            if (!stock || Number(stock.quantity) < item.quantity) {
-              throw new Error(`Stock insuficiente para el producto ${product.name}`);
-            }
-
-            // Actualizar stock atómicamente con raw query
-            await tx.$queryRawUnsafe(
-              'UPDATE "Stock" SET quantity = quantity - $1 WHERE id = $2',
-              item.quantity,
-              stock.id
-            );
-
-            // Calcular subtotales
-            const itemQuantity = new Prisma.Decimal(item.quantity);
-            const subtotal = itemQuantity.mul(product.basePrice);
-            totalSale = totalSale.add(subtotal);
-
-            // Preparar arrays de detalles y movimientos
-            saleDetails.push({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: product.basePrice,
-              subtotal: subtotal,
-            });
-
-            movements.push({
-              type: 'VENTA' as const,
-              quantity: item.quantity,
-              userId: sellerId,
-              productId: item.productId,
-              fromWarehouseId: warehouseId,
-            });
-          }
-// Calcular el total acumulando los items 
-const totalAmount = data.items.reduce((acc, item) => {
-  const itemSubtotal = new Prisma.Decimal(item.expectedPrice).times(item.quantity);
-  return acc.plus(itemSubtotal);
-}, new Prisma.Decimal(0));
-
-// Desglosar Neto e IVA usando 'totalAmount'
-const netAmount = totalAmount.dividedBy(1.19);
-const taxAmount = totalAmount.minus(netAmount);
-
-return await tx.sale.create({
-            
-  data: {
-    total: totalAmount,
-    sellerId,
-    warehouseId, 
-    idempotencyKey,
-    netAmount,
-    taxAmount,
-    details: { create: saleDetails },
-    movements: { create: movements },
-  },
-  include: { details: true },
-});
-});
-} catch (error: any) {
-// Manejo del Deadlock
-if (error.code === '40P01' && attempt < MAX_RETRIES - 1) {
-attempt++;
-// Espera aleatoria entre 50ms y 150ms para desempatar transacciones
-await new Promise((res) => setTimeout(res, 50 + Math.random() * 100));
-continue;
-}
-
-throw error;
-}
-};
           
-    
+          // Delegar validación de precios y estado al dominio de Producto
+          const { validatedItems, totalAmount } = await ProductService.validateSaleItems(tx, sortedItems);
+
+          // Delegar deducción de inventario al dominio de Stock (Escritura Atómica)
+          await StockService.deductStockAtomic(tx, warehouseId, sortedItems);
+
+          // Preparar movimientos históricos asociados a la venta
+          const movements = validatedItems.map(item => ({
+            type: 'VENTA' as const,
+            quantity: item.quantity,
+            userId: sellerId,
+            productId: item.productId,
+            fromWarehouseId: warehouseId,
+          }));
+
+          // Persistir la Venta, sus Detalles y los Movimientos
+          return await tx.sale.create({
+            data: {
+              total: totalAmount,
+              sellerId,
+              warehouseId, 
+              idempotencyKey,
+              details: { create: validatedItems },
+              movements: { create: movements },
+            },
+            include: { details: true },
+          });
+
+        });
+      } catch (error: any) {
+        if (error.code === '40P01' && attempt < MAX_RETRIES - 1) {
+          attempt++;
+          // Jitter aleatorio para desempatar hilos concurrentes
+          await new Promise((res) => setTimeout(res, 50 + Math.random() * 100));
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 }
