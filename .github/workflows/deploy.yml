@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - qa
   pull_request:
     branches:
       - main
@@ -13,10 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy-backend:
+  deploy-qa-backend:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/qa'
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar codigo del repositorio
+      - name: Descargar código del repositorio
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -35,17 +37,18 @@ jobs:
       - name: Instalar Railway CLI
         run: npm i -g @railway/cli
 
-      - name: Desplegar Backend a Railway
+      - name: Desplegar Backend a Railway (QA)
         run: railway up --ci --service stockhub
         working-directory: ./server
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_QA }}
 
-  deploy-frontend:
+  deploy-qa-frontend:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/qa'
     runs-on: ubuntu-latest
-    needs: deploy-backend
+    needs: deploy-qa-backend
     steps:
-      - name: Descargar codigo del repositorio
+      - name: Descargar código del repositorio
         uses: actions/checkout@v4
 
       - name: Configurar Node.js
@@ -56,7 +59,58 @@ jobs:
       - name: Instalar Railway CLI
         run: npm i -g @railway/cli
 
-      - name: Desplegar Frontend a Railway
+      - name: Desplegar Frontend a Railway (QA)
+        run: railway up --ci --service stockhub-frontend
+        working-directory: ./client
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_QA }}
+
+  deploy-prod-backend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias del servidor
+        run: npm ci
+        working-directory: ./server
+
+      - name: Generar cliente de Prisma
+        run: npx prisma generate
+        working-directory: ./server
+
+      - name: Instalar Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Desplegar Backend a Railway (Producción)
+        run: railway up --ci --service stockhub
+        working-directory: ./server
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-prod-frontend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: deploy-prod-backend
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Desplegar Frontend a Railway (Producción)
         run: railway up --ci --service stockhub-frontend
         working-directory: ./client
         env:
