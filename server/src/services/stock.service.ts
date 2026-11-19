@@ -4,7 +4,6 @@ import { MovementType, AdjustmentReason, Prisma } from '@prisma/client';
 export class StockService {
   static async addStock({ productId, warehouseId, quantity, userId }: { productId: string; warehouseId: string; quantity: number; userId: string }) {
     return await prisma.$transaction(async (tx) => {
-      // Buscar si ya existe el registro de stock para ese producto en esa bodega
       const existingStock = await tx.stock.findUnique({
         where: {
           productId_warehouseId: { productId, warehouseId }
@@ -14,28 +13,28 @@ export class StockService {
       const previousStock = existingStock ? Number(existingStock.quantity) : 0;
       const newStock = previousStock + quantity;
 
-      // Crear o actualizar el registro de stock
       await tx.stock.upsert({
         where: {
           productId_warehouseId: { productId, warehouseId }
         },
         update: {
-          quantity: { increment: quantity }
+          quantity: { increment: quantity },
+          version: { increment: 1 } // Mantener la versión actualizada en ingresos
         },
         create: {
           productId,
           warehouseId,
-          quantity
+          quantity,
+          version: 1 // Iniciar versión en 1
         }
       });
 
-      // Registrar el movimiento en el historial (InventoryMovement)
       await tx.movement.create({
         data: {
           type: 'INGRESO',
           quantity,
           productId,
-          toWarehouseId:warehouseId,
+          toWarehouseId: warehouseId,
           userId
         }
       });
@@ -58,15 +57,13 @@ export class StockService {
     comment?: string;
   }) {
     return await prisma.$transaction(async (tx) => {
-      // Bloqueo transaccional de la fila
-      const stockResult = await tx.$queryRawUnsafe<{ id: string, quantity: Prisma.Decimal }[]>(
-        `SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE`,
-        data.productId,
-        data.warehouseId
-      );
+      // Leer el estado actual del stock
+      const currentStockRecord = await tx.stock.findUnique({
+        where: {
+          productId_warehouseId: { productId: data.productId, warehouseId: data.warehouseId }
+        }
+      });
 
-      // ASIGNAR Y VALIDAR DIRECTAMENTE
-      const currentStockRecord = stockResult[0];
       if (!currentStockRecord) {
         throw new Error('Stock no encontrado para realizar esta salida');
       }
@@ -78,16 +75,22 @@ export class StockService {
         throw new Error('Stock insuficiente para realizar esta salida');
       }
 
-      // Actualización segura
-      const updatedStock = await tx.stock.update({
-        where: { id: currentStockRecord.id },
+      // Actualización Segura
+      const updateResult = await tx.stock.updateMany({
+        where: { 
+          id: currentStockRecord.id,
+          version: currentStockRecord.version
+        },
         data: { 
-          quantity: currentStock.minus(deductQuantity) 
+          quantity: currentStock.minus(deductQuantity),
+          version: { increment: 1 } // Incrementamos la versión
         }
       });
 
-      if (!stockResult.length) {
-        throw new Error('Stock no encontrado para realizar esta salida');
+      // Validar si otro hilo modificó el stock entre el paso 1 y el paso 2
+      if (updateResult.count === 0) {
+        // Lanzamos un error específico para que el controlador devuelva un HTTP 409
+        throw new Error('CONCURRENCY_ERROR: El stock fue modificado por otra transacción. Reintente la operación.');
       }
 
       const movement = await tx.movement.create({
@@ -102,7 +105,7 @@ export class StockService {
         }
       });
 
-      return { updatedStock, movement };
+      return { movement };
     });
   }
 
@@ -111,25 +114,34 @@ export class StockService {
     warehouseId: string,
     items: { productId: string; quantity: number }[]
   ) {
-    // Nota: Se asume que 'items' ya viene ordenado por productId para evitar deadlocks
     for (const item of items) {
-      // El bloqueo FOR UPDATE ahora vive en el dominio que le corresponde
-      const stocks = await tx.$queryRawUnsafe<Array<{ id: string; quantity: Prisma.Decimal }>>(
-        'SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE',
-        item.productId,
-        warehouseId
-      );
+      // Consultar sin bloquear la tabla
+      const stock = await tx.stock.findUnique({
+        where: {
+          productId_warehouseId: { productId: item.productId, warehouseId }
+        }
+      });
 
-      const stock = stocks[0];
       if (!stock || Number(stock.quantity) < item.quantity) {
         throw new Error(`Stock insuficiente para el producto con ID ${item.productId}`);
       }
 
-      await tx.$queryRawUnsafe(
-        'UPDATE "Stock" SET quantity = quantity - $1 WHERE id = $2',
-        item.quantity,
-        stock.id
-      );
-}
+      // Descontar aplicando Bloqueo Optimista
+      const result = await tx.stock.updateMany({
+        where: {
+          id: stock.id,
+          version: stock.version
+        },
+        data: {
+          quantity: { decrement: item.quantity },
+          version: { increment: 1 }
+        }
+      });
+
+      // Verificar concurrencia
+      if (result.count === 0) {
+        throw new Error(`CONCURRENCY_ERROR: El stock del producto ${item.productId} cambió durante la venta. Reintente.`);
+      }
+    }
   }
 }
