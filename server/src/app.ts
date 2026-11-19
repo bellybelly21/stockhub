@@ -26,18 +26,31 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permite peticiones sin origin (como Postman o curl) o peticiones desde dominios autorizados
-    if (!origin || allowedOrigins.includes(origin)) {
+    const isQA = process.env.APP_ENV === 'qa';
+    
+    // Bloquea peticiones sin origen en producción
+    if (!origin) {
+      if (isQA) return callback(null, true);
+      return callback(new Error(`Origen no permitido por CORS (Falta cabecera Origin)`));
+    }
+
+    if (allowedOrigins.includes(origin) || isQA) {
       callback(null, true);
     } else {
       callback(new Error(`Origen ${origin} no permitido por CORS`));
-    }},
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH'], 
   allowedHeaders: ['Content-Type', 'Authorization','Idempotency-Key'],
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10kb' })); // Prevención de ataques de payload
+// Limite estándar de 20KB para la mayoría de la aplicación
+const jsonParserStandard = express.json({ limit: '20kb' });
+
+// Limite expandido solo para las rutas que necesitan subir inventarios grandes
+const jsonParserLarge = express.json({ limit: '1mb' });
+
 app.use(cookieParser());
 
 // Mantiene las optimizaciones de NODE_ENV=production, pero relaja límites si es QA
@@ -73,13 +86,13 @@ app.use('/api/auth/login', loginLimiter);
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-app.use('/api/sales', saleRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/movements', movementRoutes);
-app.use('/api/warehouses', warehouseRoutes);
-app.use('/api/stock', stockRoutes);
+app.use('/api/sales', jsonParserStandard, saleRoutes);
+app.use('/api/auth', jsonParserStandard, authRoutes);
+app.use('/api/users', jsonParserStandard, userRoutes);
+app.use('/api/products', jsonParserStandard, productRoutes);
+app.use('/api/movements',jsonParserLarge, movementRoutes);
+app.use('/api/warehouses', jsonParserStandard, warehouseRoutes);
+app.use('/api/stock', jsonParserLarge, stockRoutes);
 
 // Manejo errores varios
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
