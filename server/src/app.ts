@@ -40,29 +40,35 @@ app.use(cors({
 app.use(express.json({ limit: '10kb' })); // Prevención de ataques de payload
 app.use(cookieParser());
 
-// Limitadores de Tasa
+// Mantiene las optimizaciones de NODE_ENV=production, pero relaja límites si es QA
+const isLoadTestEnv = process.env.NODE_ENV !== 'production' || process.env.APP_ENV === 'qa';
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: { success: false, error: 'Demasiadas peticiones. Intente más tarde.' }
+  max: isLoadTestEnv ? 1500 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/health',
+  message: { success: false, error: 'Demasiadas peticiones. Intente más tarde.' },
 });
 app.use('/api', limiter);
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  // 100 intentos si estás probando en dev, 5 intentos en producción
-  max: process.env.NODE_ENV === 'production' ? 5 : 100, 
-  handler: (req, res) => {
-    return res.status(429).json({ 
-      success: false, 
-      error: 'Demasiados intentos fallidos. Por favor, reintenta en 15 minutos.' 
+  max: isLoadTestEnv ? 10 : 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  handler: (_req, res) => {
+    return res.status(429).json({
+      success: false,
+      error: 'Demasiados intentos fallidos. Por favor, reintenta en 15 minutos.',
     });
-  }
+  },
 });
 app.use('/api/auth/login', loginLimiter);
 
 // Rutas
-
 // Healthcheck público para monitoreo y pruebas de carga (JMeter)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -75,10 +81,26 @@ app.use('/api/movements', movementRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/stock', stockRoutes);
 
-// Manejo de Err
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[Error Global]:', err);
-  res.status(500).json({ error: 'Error interno del servidor' });
-});
+// Manejo errores varios
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    return res.status(413).json({
+      success: false,
+      error: 'El tamaño de la petición excede el límite permitido (10KB).',
+    });
+  }
 
+  if (err.message?.includes('no permitido por CORS')) {
+    return res.status(403).json({
+      success: false,
+      error: err.message,
+    });
+  }
+
+  console.error('[Error Global]:', err);
+  return res.status(err.status || 500).json({
+    success: false,
+    error: 'Error interno del servidor',
+  });
+});
 export default app;
