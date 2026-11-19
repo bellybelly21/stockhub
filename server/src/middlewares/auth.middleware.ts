@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
-import { blacklistedUsers } from '../services/auth.service';
+import { prisma } from '../db/client';
 
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,8 +23,13 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
       assignedWarehouseId?: string | null;
     };
     
-    // VALIDACIÓN DE REVOCACIÓN INMEDIATA (BLACKLIST)
-    if (blacklistedUsers.has(decoded.id)) {
+    // Validación directa a BD en lugar del Set en memoria
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { isActive: true }
+    });
+
+    if (!user || !user.isActive) {
       return res.status(401).json({ 
         success: false, 
         error: 'Sesión revocada: Su acceso ha sido deshabilitado por un administrador.' 

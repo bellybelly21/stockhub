@@ -26,18 +26,26 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permite peticiones sin origin (como Postman o curl) o peticiones desde dominios autorizados
-    if (!origin || allowedOrigins.includes(origin)) {
+    const isQA = process.env.APP_ENV === 'qa';
+    
+    // Bloquea peticiones sin origen en producción
+    if (!origin) {
+      if (isQA) return callback(null, true);
+      return callback(new Error(`Origen no permitido por CORS (Falta cabecera Origin)`));
+    }
+
+    if (allowedOrigins.includes(origin) || isQA) {
       callback(null, true);
     } else {
       callback(new Error(`Origen ${origin} no permitido por CORS`));
-    }},
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH'], 
   allowedHeaders: ['Content-Type', 'Authorization','Idempotency-Key'],
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10kb' })); // Prevención de ataques de payload
+app.use(express.json({ limit: '1mb' })); // Incrementado a 1MB para soportar arrays grandes de inventario/ventas
 app.use(cookieParser());
 
 // Mantiene las optimizaciones de NODE_ENV=production, pero relaja límites si es QA

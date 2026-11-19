@@ -58,38 +58,42 @@ export class StockService {
     comment?: string;
   }) {
     return await prisma.$transaction(async (tx) => {
-      // Verificar el stock actual
-      const currentStock = await tx.stock.findUnique({
-        where: { 
-          productId_warehouseId: { 
-            productId: data.productId, 
-            warehouseId: data.warehouseId 
-          } 
-        }
-      });
+      // Bloqueo transaccional de la fila
+      const stockResult = await tx.$queryRawUnsafe<{ id: string, quantity: Prisma.Decimal }[]>(
+        `SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE`,
+        data.productId,
+        data.warehouseId
+      );
 
-      if (!currentStock || Number(currentStock.quantity) < data.quantity) {
+      // ASIGNAR Y VALIDAR DIRECTAMENTE
+      const currentStockRecord = stockResult[0];
+      if (!currentStockRecord) {
+        throw new Error('Stock no encontrado para realizar esta salida');
+      }
+
+      const currentStock = new Prisma.Decimal(currentStockRecord.quantity);
+      const deductQuantity = new Prisma.Decimal(data.quantity);
+
+      if (currentStock.lt(deductQuantity)) {
         throw new Error('Stock insuficiente para realizar esta salida');
       }
 
-      // Restar la cantidad del stock en la bodega
+      // Actualización segura
       const updatedStock = await tx.stock.update({
-        where: { 
-          productId_warehouseId: { 
-            productId: data.productId, 
-            warehouseId: data.warehouseId 
-          } 
-        },
+        where: { id: currentStockRecord.id },
         data: { 
-          quantity: { decrement: data.quantity } 
+          quantity: currentStock.minus(deductQuantity) 
         }
       });
 
-      // Registrar el movimiento histórico usando fromWarehouseId
+      if (!stockResult.length) {
+        throw new Error('Stock no encontrado para realizar esta salida');
+      }
+
       const movement = await tx.movement.create({
         data: {
           type: data.type,
-          quantity: data.quantity,
+          quantity: deductQuantity,
           productId: data.productId,
           fromWarehouseId: data.warehouseId,
           userId: data.userId,

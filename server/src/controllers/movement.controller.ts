@@ -17,19 +17,27 @@ export const createMovement = async (req: Request, res: Response): Promise<any> 
 
   try {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Validar y descontar origen (Salidas y Transferencias)
+      
       if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA'].includes(type)) {
-        const originStock = await tx.stock.findUnique({
-          where: { productId_warehouseId: { productId, warehouseId: fromWarehouseId } }
-        });
+        // Bloqueo de fila
+        const originStocks = await tx.$queryRawUnsafe<{ id: string, quantity: Prisma.Decimal }[]>(
+          `SELECT id, quantity FROM "Stock" WHERE "productId" = $1 AND "warehouseId" = $2 FOR UPDATE`,
+          productId, 
+          fromWarehouseId
+        );
 
-        if (!originStock || originStock.quantity.lessThan(numericQuantity)) {
-          throw new Error(`INSUFFICIENT_STOCK:${originStock ? originStock.quantity.toString() : '0'}`);
+        // ASIGNAR Y VALIDAR DIRECTAMENTE
+        const originStock = originStocks[0];
+
+        if (!originStock || new Prisma.Decimal(originStock.quantity).lt(numericQuantity)) {
+          const available = originStock ? originStock.quantity.toString() : '0';
+          throw new Error(`INSUFFICIENT_STOCK:${available}`);
         }
 
+        // USO SEGURO DE LA VARIABLE originStock
         await tx.stock.update({
           where: { id: originStock.id },
-          data: { quantity: { decrement: numericQuantity } }
+          data: { quantity: new Prisma.Decimal(originStock.quantity).minus(numericQuantity) }
         });
       }
 
