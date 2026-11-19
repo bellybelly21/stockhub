@@ -247,7 +247,7 @@
           <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
           <stringProp name="HTTPSampler.port">${PORT}</stringProp>
           <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
-          <stringProp name="HTTPSampler.path">/api/products?limit=20&warehouseId=${__P(SHARED_WAREHOUSE_ID)}</stringProp>
+          <stringProp name="HTTPSampler.path">/api/products?limit=20&amp;warehouseId=${__P(SHARED_WAREHOUSE_ID)}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
@@ -493,7 +493,7 @@
           <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
           <stringProp name="HTTPSampler.port">${PORT}</stringProp>
           <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
-          <stringProp name="HTTPSampler.path">/api/stock/global?warehouseId=${__P(SHARED_WAREHOUSE_ID)}&status=ACTIVO&search=a</stringProp>
+          <stringProp name="HTTPSampler.path">/api/stock/global?warehouseId=${__P(SHARED_WAREHOUSE_ID)}&amp;status=ACTIVO&amp;search=a</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
@@ -512,7 +512,7 @@
           <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
           <stringProp name="HTTPSampler.port">${PORT}</stringProp>
           <stringProp name="HTTPSampler.protocol">${PROTOCOL}</stringProp>
-          <stringProp name="HTTPSampler.path">/api/products?page=50&limit=50</stringProp>
+          <stringProp name="HTTPSampler.path">/api/products?page=50&amp;limit=50</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
         </HTTPSamplerProxy>
