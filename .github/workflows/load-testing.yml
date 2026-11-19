@@ -36,14 +36,20 @@ jobs:
 
       - name: Ejecutar prueba de carga HTTPS contra stockhub-qa
         run: |
-          mkdir -p jmeter-results/html-report
-          jmeter -n \
-            -t ./tests/performance/stockhub-load-test.jmx \
-            -JHOST=${{ secrets.QA_API_HOST }} \
-            -JPROTOCOL=https \
-            -JPORT=443 \
-            -l ./jmeter-results/results.jtl \
-            -e -o ./jmeter-results/html-report
+            # Dejamos que JMeter cree la subcarpeta html-report automáticamente para evitar errores
+            mkdir -p jmeter-results
+            
+            jmeter -n \
+              -t ./tests/performance/stockhub-load-test.jmx \
+              -JHOST=${{ secrets.QA_API_HOST }} \
+              -JPROTOCOL=https \
+              -JPORT=443 \
+              -JADMIN_EMAIL=${{ secrets.QA_ADMIN_EMAIL }} \
+              -JADMIN_PASS=${{ secrets.QA_ADMIN_PASS }} \
+              -JSELLER_EMAIL=${{ secrets.QA_SELLER_EMAIL }} \
+              -JSELLER_PASS=${{ secrets.QA_SELLER_PASS }} \
+              -l ./jmeter-results/results.jtl \
+              -e -o ./jmeter-results/html-report
 
       - name: Subir Reportes JMeter a GitHub Artifacts
         if: always()
