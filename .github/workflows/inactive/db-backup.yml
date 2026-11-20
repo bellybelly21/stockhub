@@ -1,0 +1,72 @@
+#cronjob inactivo por ahora (cuando esté en producción se cambiará de carpeta)
+name: DB Backup Producción (Cronjob 8h)
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup-postgres-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar PostgreSQL 18 (pg_dump) y p7zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common p7zip-full
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+
+      - name: Extraer y comprimir Dump DB Producción (.sql.gz)
+        env:
+          DATABASE_PUBLIC_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
+          PGSSLMODE: require
+        run: |
+          mkdir -p backups
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          BACKUP_FILE="backups/stockhub_prod_${TIMESTAMP}.sql.gz"
+          
+          pg_dump "$DATABASE_PUBLIC_URL" \
+            --no-owner \
+            --no-acl \
+            --format=plain | gzip > "$BACKUP_FILE"
+          
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "❌ Error: El archivo de respaldo está vacío."
+            exit 1
+          fi
+          
+          echo "✅ Respaldo generado: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+
+      - name: Cifrar Backup con 7z (AES-256) y generar SHA256
+        env:
+          PASSWORD: ${{ secrets.ARTIFACT_PASSWORD }}
+        run: |
+          if [ -z "$PASSWORD" ]; then
+            echo "❌ Error: El secreto ARTIFACT_PASSWORD no está configurado."
+            exit 1
+          fi
+
+          TIMESTAMP=$(date -u +"%Y%m%d_%H%M%S")
+          ARCHIVE_NAME="stockhub_prod_${TIMESTAMP}.7z"
+
+          # Cifrado AES-256 nativo 7z + cifrado de cabeceras/nombres (-mhe=on)
+          7z a -t7z -m0=lzma2 -mx=9 -mhe=on -p"$PASSWORD" "$ARCHIVE_NAME" ./backups/*.sql.gz
+
+          # Eliminar inmediatamente el respaldo plano de la máquina runner
+          rm -rf ./backups
+
+          # Generar firma SHA-256 del archivo cifrado para verificar integridad al descargar
+          sha256sum "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
+
+          echo "🔒 Backup cifrado exitosamente: $ARCHIVE_NAME"
+          cat "${ARCHIVE_NAME}.sha256"
+
+      - name: Guardar Dump Cifrado en GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dumps-DB-Produccion-${{ github.run_number }}
+          path: |
+            *.7z
+            *.7z.sha256
+          retention-days: 90

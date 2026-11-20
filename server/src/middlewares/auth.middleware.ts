@@ -3,6 +3,18 @@ import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import { prisma } from '../db/client';
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        role: Role;
+        assignedWarehouseId: string | null;
+      };
+    }
+  }
+}
+
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const authHeader = req.headers.authorization;
   
