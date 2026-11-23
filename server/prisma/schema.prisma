@@ -69,6 +69,7 @@ model User {
   password            String
   role                Role
   isActive            Boolean     @default(true)
+  tokenVersion        Int            @default(0)
 
   assignedWarehouse   Warehouse?  @relation("UserAssignedWarehouse", fields: [assignedWarehouseId], references: [id])
   assignedWarehouseId String?
@@ -89,6 +90,9 @@ model RefreshToken {
   tokenHash String   @unique
   expiresAt DateTime
   isRevoked Boolean  @default(false)
+  absoluteExpiresAt DateTime 
+  revokedAt         DateTime? 
+  replacedByToken   String?
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
@@ -259,8 +263,10 @@ model Sale {
 
   details        SaleDetail[]
   movements      Movement[]
-  idempotencyKey String?      @unique
+  idempotencyKey String     
+  payloadHash    String
 
+  @@unique([sellerId, idempotencyKey])
   @@index([createdAt])
   @@index([sellerId])
   @@index([warehouseId])

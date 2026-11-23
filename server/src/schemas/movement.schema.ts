@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const createMovementSchema = z.object({
   body: z.object({
-    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA']),
-    quantity: z.number().positive('La cantidad debe ser mayor a 0'),
+    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA', 'TRANSFERENCIA_ENTRADA']),
+    quantity: z.number().refine(val => val !== 0, { message: 'La cantidad no puede ser 0' }),
     productId: z.string().uuid('El ID del producto es inválido'),
     fromWarehouseId: z.string().uuid('ID de bodega origen inválido').optional(),
     toWarehouseId: z.string().uuid('ID de bodega destino inválido').optional(),

@@ -3,17 +3,9 @@ import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import { prisma } from '../db/client';
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        role: Role;
-        assignedWarehouseId: string | null;
-      };
-    }
-  }
-}
+// Caché en memoria para evitar saturar PostgreSQL
+const userStatusCache = new Map<string, { isActive: boolean; tokenVersion: number; cachedAt: number }>();
+const CACHE_TTL_MS = 15000; // 15 segundos
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const authHeader = req.headers.authorization;
@@ -33,18 +25,32 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       id: string;
       role: Role;
       assignedWarehouseId?: string | null;
+      tokenVersion: number;
     };
     
-    // Validación directa a BD en lugar del Set en memoria
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { isActive: true }
-    });
+    const now = Date.now();
+    let status = userStatusCache.get(decoded.id);
 
-    if (!user || !user.isActive) {
+    // Si no está en caché o la caché expiró, consultamos a la BD
+    if (!status || now - status.cachedAt > CACHE_TTL_MS) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { isActive: true, tokenVersion: true }
+      });
+
+      if (!dbUser) {
+        return res.status(401).json({ success: false, error: 'Usuario no existe' });
+      }
+
+      status = { isActive: dbUser.isActive, tokenVersion: dbUser.tokenVersion, cachedAt: now };
+      userStatusCache.set(decoded.id, status);
+    }
+
+    // Validación de revocación inmediata o cuenta desactivada
+    if (!status.isActive || status.tokenVersion !== decoded.tokenVersion) {
       return res.status(401).json({ 
         success: false, 
-        error: 'Sesión revocada: Su acceso ha sido deshabilitado por un administrador.' 
+        error: 'Sesión revocada: Su acceso ha sido deshabilitado o la sesión expiró.' 
       });
     }
     
@@ -52,7 +58,9 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       id: decoded.id,
       role: decoded.role,
       assignedWarehouseId: decoded.assignedWarehouseId || null,
+      tokenVersion: decoded.tokenVersion,
     };
+    
     next();
   } catch (error) {
     return res.status(401).json({ success: false, error: 'Token inválido o expirado' });

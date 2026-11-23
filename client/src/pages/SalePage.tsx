@@ -32,6 +32,7 @@ export default function SalesPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [lastSaleTotal, setLastSaleTotal] = useState<number>(0); 
+  const [checkoutKey, setCheckoutKey] = useState<string>(() => `tx-pos-${crypto.randomUUID()}`);
 
   // CARGA DE CATÁLOGO ESPECÍFICO POR BODEGA
   const fetchCatalog = async (silent = false) => {
@@ -93,6 +94,10 @@ export default function SalesPage() {
   useEffect(() => {
     fetchCatalog();
   }, [user?.assignedWarehouseId, accessToken]);
+
+  useEffect(() => {
+    setCheckoutKey(`tx-pos-${crypto.randomUUID()}`);
+  }, [cart]);
 
   // FILTRADO
   const filteredProducts = useMemo(() => {
@@ -161,7 +166,6 @@ export default function SalesPage() {
     setLastSaleTotal(cartTotal);
 
     try {
-      const idempotencyKey = `tx-pos-${crypto.randomUUID()}`;
 
       const payload = {
         items: cart.map((item) => ({
@@ -176,7 +180,7 @@ export default function SalesPage() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
-          'Idempotency-Key': idempotencyKey,
+          'Idempotency-Key': checkoutKey,
         },
         body: JSON.stringify(payload),
       });
