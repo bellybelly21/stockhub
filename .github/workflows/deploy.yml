@@ -8,14 +8,14 @@ on:
   pull_request:
     branches:
       - main
+      - qa
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy-qa-backend:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/qa'
+  ci-checks:
     runs-on: ubuntu-latest
     steps:
       - name: Descargar código del repositorio
@@ -26,13 +26,24 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Instalar dependencias del servidor
-        run: npm ci
+      - name: Instalar dependencias y verificar compilación (Server)
         working-directory: ./server
+        run: |
+          npm ci
+          npm run build
 
-      - name: Generar cliente de Prisma
-        run: npx prisma generate
-        working-directory: ./server
+  deploy-qa-backend:
+    needs: ci-checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/qa'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Instalar Railway CLI
         run: npm i -g @railway/cli
@@ -44,9 +55,9 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_QA }}
 
   deploy-qa-frontend:
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/qa'
-    runs-on: ubuntu-latest
     needs: deploy-qa-backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/qa'
+    runs-on: ubuntu-latest
     steps:
       - name: Descargar código del repositorio
         uses: actions/checkout@v4
@@ -66,7 +77,9 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_QA }}
 
   deploy-prod-backend:
+    needs: ci-checks
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Descargar código del repositorio
@@ -76,14 +89,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Instalar dependencias del servidor
-        run: npm ci
-        working-directory: ./server
-
-      - name: Generar cliente de Prisma
-        run: npx prisma generate
-        working-directory: ./server
 
       - name: Instalar Railway CLI
         run: npm i -g @railway/cli
@@ -95,9 +100,9 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   deploy-prod-frontend:
+    needs: deploy-prod-backend
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: deploy-prod-backend
     steps:
       - name: Descargar código del repositorio
         uses: actions/checkout@v4

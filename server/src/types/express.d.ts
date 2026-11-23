@@ -8,6 +8,7 @@ declare global {
         id: string;
         role: Role;
         assignedWarehouseId: string | null;
+        tokenVersion: number;
       };
     }
   }
@@ -19,5 +20,6 @@ export interface AuthenticatedRequest extends Express.Request {
     id: string;
     role: Role;
     assignedWarehouseId: string | null;
+    tokenVersion: number;
   };
 }

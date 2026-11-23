@@ -30,22 +30,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   
-  // Ref de bloqueo para evitar que el StrictMode de React o doble render envíen 2 peticiones a la vez
   const isCheckingAuth = useRef(false);
 
   const login = (token: string, userData: User) => {
     setAccessToken(token);
     setUser(userData);
     
-    // Redirección inteligente basada en RBAC
     let redirectPath = '/';
-    if (userData.role === 'ADMIN') {
-      redirectPath = '/dashboard';
-    } else if (userData.role === 'BODEGUERO') {
-      redirectPath = '/inventory';
-    } else if (userData.role === 'VENDEDOR') {
-      redirectPath = '/sales';
-    }
+    if (userData.role === 'ADMIN') redirectPath = '/dashboard';
+    else if (userData.role === 'BODEGUERO') redirectPath = '/inventory';
+    else if (userData.role === 'VENDEDOR') redirectPath = '/sales';
 
     navigate(redirectPath, { replace: true });
   };
@@ -54,12 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest' // Bloqueo CSRF
+        },
         credentials: 'include',
       });
     } catch (error) {
       console.error('Error al notificar cierre de sesión al servidor:', error);
     } finally {
-      // Limpiamos el estado sin importar si el servidor respondió bien o mal
       setAccessToken(null);
       setUser(null);
       navigate('/', { replace: true });
@@ -67,25 +64,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkAuth = async () => {
-    // Si ya hay una petición en curso, no hacemos nada (evita la colisión)
     if (isCheckingAuth.current) return;
     isCheckingAuth.current = true;
 
     try {
       const response = await fetch(`${API_URL}/api/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest' // Bloqueo CSRF
+        },
         credentials: 'include',
       });
 
-      // El .catch evita que crashee si el servidor devuelve un error HTML en lugar de JSON
       const data = await response.json().catch(() => ({})); 
 
       if (response.ok && data.success && data.accessToken && data.user) {
         setAccessToken(data.accessToken);
         setUser(data.user);
       } else {
-        // Si no es OK, limpiamos la sesión
         setAccessToken(null);
         setUser(null);
       }
@@ -94,18 +91,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(null);
       setUser(null);
     } finally {
-      // Liberamos el estado de carga y el candado de concurrencia
       setIsLoading(false);
       isCheckingAuth.current = false;
     }
   };
 
-  // Verificación inicial de la sesión al montar la app
   useEffect(() => {
     checkAuth();
-  }, []); // Solo se ejecuta una vez al montar
+  }, []); 
 
-  // Temporizador de 14 minutos que solo corre mientras haya sesión activa
   useEffect(() => {
     if (!accessToken) return;
 
@@ -115,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, FOURTEEN_MINUTES);
 
     return () => clearInterval(interval);
-  }, [accessToken]); // Se recrea el intervalo si el accessToken cambia
+  }, [accessToken]); 
 
   return (
     <AuthContext.Provider

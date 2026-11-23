@@ -3,9 +3,7 @@ import { AuthService } from '../services/auth.service';
 
 const getCookieOptions = () => ({
   httpOnly: true,
-  // En producción (Railway) será true, en local será false
   secure: process.env.NODE_ENV === 'production',
-  // En producción necesita 'none' para cross-domain, en local usa 'lax'
   sameSite: process.env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
 });
 
@@ -17,7 +15,7 @@ export class AuthController {
 
       res.cookie('refreshToken', result.rawRefreshToken, {
         ...getCookieOptions(),
-        maxAge: result.EIGHT_HOURS_MS,
+        maxAge: result.expiresInMs,
       });
 
       return res.status(200).json({
@@ -36,6 +34,11 @@ export class AuthController {
 
   static async refresh(req: Request, res: Response) {
     try {
+      // Prevención estricta CSRF
+      if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
+        return res.status(403).json({ success: false, error: 'Falta cabecera anti-CSRF' });
+      }
+
       const rawRefreshToken = req.cookies?.refreshToken;
       if (!rawRefreshToken) {
         return res.status(200).json({ success: false, authenticated: false });
@@ -45,7 +48,7 @@ export class AuthController {
 
       res.cookie('refreshToken', result.rawRefreshToken, {
         ...getCookieOptions(),
-        maxAge: result.EIGHT_HOURS_MS,
+        maxAge: result.expiresInMs,
       });
 
       return res.status(200).json({
@@ -56,16 +59,20 @@ export class AuthController {
     } catch (error: any) {
       res.clearCookie('refreshToken', getCookieOptions());
       
-      if (error.message === 'Alerta de seguridad: Sesión comprometida') {
+      if (error.message === 'Alerta de seguridad: Sesión comprometida' || error.message.includes('Jornada')) {
         return res.status(403).json({ success: false, error: error.message });
       }
-      // Para token no encontrado, expirado o inactivo, simplemente negamos la autenticación
       return res.status(200).json({ success: false, authenticated: false });
     }
   }
 
   static async logout(req: Request, res: Response) {
     try {
+      // Prevención estricta CSRF
+      if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
+        return res.status(403).json({ success: false, error: 'Falta cabecera anti-CSRF' });
+      }
+
       const refreshToken = req.cookies?.refreshToken;
       if (refreshToken) {
         await AuthService.logout(refreshToken);
