@@ -169,3 +169,21 @@ export const registerStockOutbound = async (req: Request, res: Response): Promis
     return res.status(500).json({ success: false, error: error.message || 'Error interno al registrar la salida de stock' });
   }
 };
+
+export const getCriticalStock = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const warehouseId =
+      typeof req.query.warehouseId === 'string' && req.query.warehouseId !== 'Todas'
+        ? req.query.warehouseId
+        : undefined;
+
+    const data = await StockService.getCriticalStock(warehouseId);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error('[Critical Stock Query Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al consultar las alertas de stock crítico',
+    });
+  }
+};

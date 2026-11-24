@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createMovementSchema = z.object({
   body: z.object({
-    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA', 'TRANSFERENCIA_ENTRADA']),
+    type: z.enum(['INGRESO', 'MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA']),
     quantity: z.number().refine(val => val !== 0, { message: 'La cantidad no puede ser 0' }),
     productId: z.string().uuid('El ID del producto es inválido'),
     fromWarehouseId: z.string().uuid('ID de bodega origen inválido').optional(),
@@ -10,6 +10,14 @@ export const createMovementSchema = z.object({
     reason: z.enum(['DANADO_RECEPCION', 'MERMA_FISICA', 'VENCIMIENTO', 'DONACION', 'OTRO']).optional(),
     comment: z.string().min(5, 'El comentario debe tener al menos 5 caracteres').optional(),
   }).superRefine((data, ctx) => {
+    if (data.type !== 'AJUSTE' && data.quantity < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Solo los ajustes permiten cantidades negativas',
+        path: ['quantity'],
+      });
+    }
+
     if (['MERMA', 'AJUSTE', 'DONACION', 'TRANSFERENCIA_SALIDA'].includes(data.type) && !data.fromWarehouseId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -43,3 +51,5 @@ export const createMovementSchema = z.object({
     }
   }),
 });
+
+export type CreateMovementInput = z.infer<typeof createMovementSchema>['body'];

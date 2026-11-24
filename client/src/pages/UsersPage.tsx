@@ -136,9 +136,12 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Filtros utilizando el UI Kit */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-end sm:items-center">
-        <div className="w-full sm:w-96">
+      {/* Filtros */}
+      <div className="bg-white rounded-xl border border-light-gray p-4 lg:p-6 flex flex-col md:flex-row gap-4 items-end">
+        <div className="w-full md:flex-1">
+          <label className="block text-xs font-semibold text-slate-dark mb-2 uppercase tracking-wider">
+            Buscar Usuario
+          </label>
           <Input
             placeholder="Buscar por nombre o correo..."
             value={searchQuery}
@@ -146,10 +149,10 @@ export default function UsersPage() {
             startIcon={<Search size={16} />}
           />
         </div>
-        
-        <div className="md:w-fit w-full flex items-center gap-2">
-           <label className="text-xs font-semibold text-slate-mid uppercase tracking-wider shrink-0 hidden sm:block">
-            Filtrar por Rol:
+
+        <div className="w-full md:w-56 shrink-0">
+          <label className="block text-xs font-semibold text-slate-dark mb-2 uppercase tracking-wider">
+            Rol
           </label>
           <Select
             value={roleFilter}
@@ -158,7 +161,7 @@ export default function UsersPage() {
               { value: 'ALL', label: 'Todos los roles' },
               { value: 'ADMIN', label: 'Administrador' },
               { value: 'VENDEDOR', label: 'Vendedor' },
-              { value: 'BODEGUERO', label: 'Bodeguero' }
+              { value: 'BODEGUERO', label: 'Bodeguero' },
             ]}
           />
         </div>

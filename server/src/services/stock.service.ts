@@ -146,4 +146,103 @@ export class StockService {
       };
     });
   }
+
+  static async getCriticalStock(warehouseId?: string) {
+    const stocks = await prisma.stock.findMany({
+      where: {
+        ...(warehouseId ? { warehouseId } : {}),
+        warehouse: { isActive: true },
+        product: { status: { not: 'INACTIVO' } },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            brand: true,
+            unitOfMeasure: true,
+            criticalStock: true,
+          },
+        },
+        warehouse: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Filtrar stock_actual <= stock_critico y calcular déficit
+    const criticalItems = stocks
+      .map((s) => {
+        const currentStock = Number(s.quantity);
+        const criticalStock = Number(s.product.criticalStock);
+        const deficit = Number((currentStock - criticalStock).toFixed(3)); // Negativo o 0
+        const relativeDeficit =
+          criticalStock > 0 ? deficit / criticalStock : currentStock === 0 ? -1 : 0;
+
+        // Urgencia alta si está agotado (0) o le falta >= 50% del stock crítico
+        const urgency: 'ALTA' | 'MEDIA' =
+          currentStock === 0 || relativeDeficit <= -0.5 ? 'ALTA' : 'MEDIA';
+
+        return {
+          stockId: s.id,
+          productId: s.product.id,
+          sku: s.product.sku,
+          productName: s.product.name,
+          brand: s.product.brand,
+          unitOfMeasure: s.product.unitOfMeasure,
+          warehouseId: s.warehouse.id,
+          warehouseName: s.warehouse.name,
+          currentStock,
+          criticalStock,
+          deficit,
+          relativeDeficit: Number(relativeDeficit.toFixed(4)),
+          urgency,
+        };
+      })
+      .filter((item) => item.currentStock <= item.criticalStock)
+      // Ordenar por mayor déficit relativo (más negativo primero); desempate por déficit absoluto
+      .sort((a, b) => a.relativeDeficit - b.relativeDeficit || a.deficit - b.deficit);
+
+    // Calcular KPIs superiores
+    const totalCriticalProducts = criticalItems.length;
+    const totalDeficitUnits = Number(
+      criticalItems.reduce((acc, item) => acc + Math.abs(item.deficit), 0).toFixed(3)
+    );
+
+    // Agrupar por bodega para identificar la de mayor déficit
+    const warehouseStats = new Map<
+      string,
+      { warehouseId: string; warehouseName: string; criticalCount: number; deficitUnits: number }
+    >();
+
+    for (const item of criticalItems) {
+      const prev = warehouseStats.get(item.warehouseId) ?? {
+        warehouseId: item.warehouseId,
+        warehouseName: item.warehouseName,
+        criticalCount: 0,
+        deficitUnits: 0,
+      };
+      prev.criticalCount += 1;
+      prev.deficitUnits += Math.abs(item.deficit);
+      warehouseStats.set(item.warehouseId, prev);
+    }
+
+    const topDeficitWarehouse =
+      Array.from(warehouseStats.values()).sort(
+        (a, b) => b.deficitUnits - a.deficitUnits || b.criticalCount - a.criticalCount
+      )[0] ?? null;
+
+    return {
+      summary: {
+        totalCriticalProducts,
+        totalDeficitUnits,
+        topDeficitWarehouse,
+      },
+      items: criticalItems,
+    };
+  }
 }

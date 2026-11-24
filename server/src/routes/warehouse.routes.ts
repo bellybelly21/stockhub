@@ -1,35 +1,21 @@
 import { Router } from 'express';
-import { prisma } from '../db/client';
-import { requireAuth } from '../middlewares/auth.middleware';
+import { createWarehouse, getActiveWarehouses } from '../controllers/warehouse.controller';
+import { requireAuth, requireRole } from '../middlewares/auth.middleware';
+import { validateSchema } from '../middlewares/validate.middleware';
+import { createWarehouseSchema } from '../schemas/warehouse.schema';
 
 const router = Router();
 
-// GET /api/warehouses
-router.get('/', requireAuth, async (req, res) => {
-  try {
-    const warehouses = await prisma.warehouse.findMany({
-      where: { isActive: true },
-    });
-    return res.json({ success: true, data: warehouses });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
+// GET /api/warehouses (Todos los roles autenticados pueden listar bodegas activas)
+router.get('/', requireAuth, getActiveWarehouses);
 
-// POST /api/warehouses
-router.post('/', requireAuth, async (req, res) => {
-    try {
-      const { name, location } = req.body;
-      const warehouse = await prisma.warehouse.create({
-        data: { 
-          name, 
-          location 
-        },
-      });
-      return res.status(201).json({ success: true, data: warehouse });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  });
+// POST /api/warehouses (Solo ADMIN puede crear bodegas)
+router.post(
+  '/',
+  requireAuth,
+  requireRole(['ADMIN']),
+  validateSchema(createWarehouseSchema),
+  createWarehouse
+);
 
 export default router;

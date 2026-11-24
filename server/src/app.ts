@@ -12,6 +12,8 @@ import productRoutes from './routes/product.routes';
 import movementRoutes from './routes/movement.routes';
 import warehouseRoutes from './routes/warehouse.routes';
 import stockRoutes from './routes/stock.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import reportRoutes from './routes/report.routes';
 
 const app = express();
 
@@ -29,7 +31,7 @@ const allowedOrigins = [
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'], 
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key'], 
 }));
 
 app.use(cors({
@@ -143,6 +145,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/sales', jsonParserStandard, saleRoutes);
 app.use('/api/auth', jsonParserStandard, authRoutes);
 app.use('/api/users', jsonParserStandard, userRoutes);
+app.use('/api/dashboard', jsonParserStandard, dashboardRoutes);
+app.use('/api/reports', jsonParserStandard, reportRoutes)
 app.use('/api/products', jsonParserStandard, productRoutes);
 app.use('/api/movements', jsonParserLarge, movementRoutes);
 app.use('/api/warehouses', jsonParserStandard, warehouseRoutes);

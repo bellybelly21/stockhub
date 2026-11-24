@@ -9,7 +9,7 @@ const router = Router();
 // Protegemos la ruta
 router.post('/', 
   requireAuth, 
-  requireRole(['ADMIN', 'BODEGUERO']), 
+  requireRole(['ADMIN', 'BODEGUERO', 'VENDEDOR']), 
   validateSchema(createMovementSchema), 
   createMovement
 );
