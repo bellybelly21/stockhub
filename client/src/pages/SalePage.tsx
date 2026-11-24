@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Minus, Plus, X, CheckCircle, AlertCircle, Info, ShoppingCart } from 'lucide-react';
+import { Search, Minus,AlertCircle, Plus, X, CheckCircle, ShoppingCart } from 'lucide-react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import OutboundStockModal, { type Product, type Warehouse } from './OutboundStockModal';
 
 // Interfaz
 interface PosProduct {
@@ -157,7 +158,7 @@ export default function SalesPage() {
 
   const handleClearCart = () => setCart([]);
 
-  // 4. LÓGICA DE COBRO
+  // LÓGICA DE COBRO
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setIsProcessing(true);
@@ -204,19 +205,53 @@ export default function SalesPage() {
     }
   };
 
+  const [isOutboundOpen, setIsOutboundOpen] = useState(false);
+
+  // Adaptación de productos y bodega actual para OutboundStockModal
+  const modalProducts: Product[] = useMemo(() => {
+    if (!user?.assignedWarehouseId) return [];
+    return products.map((p) => ({
+      id: p.productId,
+      sku: p.sku,
+      barcode: '',
+      name: p.name,
+      brand: p.brand,
+      supplier: '',
+      unitOfMeasure: 'UN',
+      status: (p.status as 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO') || 'ACTIVO',
+      stocks: [
+        {
+          id: `${p.productId}-${user.assignedWarehouseId}`,
+          warehouseId: user.assignedWarehouseId!,
+          quantity: p.stock,
+        },
+      ],
+    }));
+  }, [products, user?.assignedWarehouseId]);
+
+  const modalWarehouses: Warehouse[] = useMemo(() => {
+    if (!user?.assignedWarehouseId) return [];
+    return [
+      {
+        id: user.assignedWarehouseId,
+        name: 'Bodega asignada',
+      },
+    ];
+  }, [user?.assignedWarehouseId]);
+
   return (
     <>
-      <section className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-100px)] mb-12 sm:px-0 relative">
+      <section className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-150px)] mb-12 sm:px-0 relative">
         
         {/* PRODUCTOS*/}
-        <div className="flex-1 flex flex-col overflow-hidden h-full">
-          <div className="bg-white rounded-xl border border-light-gray p-4 mb-6 shrink-0">
+        <div className="flex-1 flex flex-col overflow-hidden h-full p-2">
+          <div className="bg-white mb-6 shrink-0 rounded-xl!">
             <Input
               placeholder="Buscar producto por nombre, SKU o marca..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               startIcon={<Search size={18} className="text-slate-400" />}
-              className="w-full border-none shadow-none text-base focus:ring-0"
+              className="w-full shadow-none text-base"
             />
           </div>
 
@@ -231,7 +266,7 @@ export default function SalesPage() {
                  No se encontraron productos disponibles en tu bodega.
                </div>
             ) : (
-              <div className="grid grid-cols-2 pt-3 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-12">
+              <div className="grid grid-cols-1 pt-3 sm:grid-cols-2 xl:grid-cols-4 gap-4 pb-12">
                 {filteredProducts.map((product) => {
                   const cartItem = cart.find((i) => i.product.productId === product.productId);
                   const isSelected = !!cartItem;
@@ -280,7 +315,7 @@ export default function SalesPage() {
         </div>
 
         {/* CARRITO */}
-        <div className="w-full lg:w-[400px] shrink-0 bg-white rounded-2xl border border-light-gray flex flex-col h-[calc(100vh-100px)] sticky top-0 shadow-sm">
+        <div className="w-full lg:w-[400px] shrink-0 bg-white rounded-2xl border border-light-gray flex flex-col h-[calc(100vh-150px)] sticky top-0 shadow-sm">
           
           <div className="p-5 border-b border-light-gray flex items-center gap-3">
             <h2 className="text-lg font-bold text-dark">Carrito</h2>
@@ -373,10 +408,14 @@ export default function SalesPage() {
               Vaciar carrito
             </button>
 
-            <button className="w-full mt-2 py-2.5 px-4 bg-white border border-light-gray text-slate-400 rounded-lg text-xs font-medium flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
-              <Info size={14} />
-              Reportar producto dañado
-            </button>
+            <Button
+              variant="ghost"
+              onClick={() => setIsOutboundOpen(true)}
+              leftIcon={<AlertCircle size={18} className="text-black" />}
+              className="border-light-gray border hover:bg-rose-50 hover:border-rose-300 w-full sm:w-auto font-medium"
+            >
+              Reportar producto defectuoso
+            </Button>
           </div>
         </div>
       </section>
@@ -424,6 +463,18 @@ export default function SalesPage() {
           </div>
         </div>
       )}
+      {/* MODAL DE DECREMENTO / PRODUCTO DAÑADO */}
+      <OutboundStockModal
+        isOpen={isOutboundOpen}
+        onClose={() => setIsOutboundOpen(false)}
+        products={modalProducts}
+        warehouses={modalWarehouses}
+        isPosMode={true}
+        initialProductId={cart[0]?.product.productId}
+        onSuccess={() => {
+          fetchCatalog(true);
+        }}
+      />
     </>
   );
 }

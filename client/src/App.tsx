@@ -11,6 +11,11 @@ import ProductsPage from './pages/ProductsPage';
 import MovementsPage from './pages/MovementsPage';
 import TransferPage from './pages/TransferPage';
 import SalesPage from './pages/SalePage';
+import AddWarehouse from './pages/AddWarehouse';
+import WarehousesPage from './pages/WarehousesPage';
+import CriticalStockPage from './pages/CriticalStockPage';
+import DashboardPage from './pages/DashboardPage';
+import ReportsPage from './pages/ReportsPage';
 
 function App() {
   return (
@@ -24,11 +29,6 @@ function App() {
           <Route element={<MainLayout />}>
             
             {/* --- ADMIN --- */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <div className="p-8">Dashboard Admin (Estadísticas)</div>
-              </ProtectedRoute>
-            } />
             <Route path="/users" element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <UsersPage />
@@ -92,13 +92,45 @@ function App() {
                 <SalesPage />
               </ProtectedRoute>
             } />
-            
-            {/* Ejemplos de rutas pendientes */}
-            <Route path="/warehouses" element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Bodegas</div></ProtectedRoute>} />
-            
-            <Route path="/critical-stock" element={<ProtectedRoute allowedRoles={['ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Stock Crítico</div></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute allowedRoles={['ADMIN']}><div className="p-4 bg-white rounded-lg  border border-slate-200">Reportes</div></ProtectedRoute>} />
 
+            <Route path="/warehouses" element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <WarehousesPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/warehouses/add" element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AddWarehouse />
+              </ProtectedRoute>
+            } />
+
+            <Route
+              path="/critical-stock"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <CriticalStockPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <ReportsPage />
+                </ProtectedRoute>
+              }
+            />
             
           </Route>
         </Routes>

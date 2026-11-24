@@ -73,8 +73,7 @@ export default function MainLayout() {
       case 'BODEGUERO':
         return [
           ALL_MENU_ITEMS.INVENTARIO, ALL_MENU_ITEMS.PRODUCTOS,
-          ALL_MENU_ITEMS.TRANSFERENCIAS, ALL_MENU_ITEMS.ENTRADAS,
-          ALL_MENU_ITEMS.BODEGAS
+          ALL_MENU_ITEMS.TRANSFERENCIAS, ALL_MENU_ITEMS.ENTRADAS
         ];
       case 'VENDEDOR':
         return [ALL_MENU_ITEMS.VENTAS];
@@ -95,6 +94,7 @@ export default function MainLayout() {
     'movements': 'Entrada de mercancía',
     'sales': 'Ventas',
     'warehouses': 'Bodegas',
+    'warehouses/add': 'Nueva bodega',
     'transfers': 'Transferencias',
     'critical-stock': 'Stock crítico',
     'reports': 'Reportes',
