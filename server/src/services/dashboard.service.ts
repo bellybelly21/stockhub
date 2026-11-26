@@ -150,7 +150,7 @@ export class DashboardService {
     }
 
     // Top 5 productos más vendidos (últimos 30 días)
-    const productSalesMap = new Map<string, { name: string; unitsSold: number }>();
+    const productSalesMap = new Map<number, { name: string; unitsSold: number }>();
     for (const detail of saleDetails30d) {
       const netQty = Number(detail.quantity) - Number(detail.returnedQuantity);
       if (netQty <= 0) continue;
@@ -173,7 +173,7 @@ export class DashboardService {
     // Valor de inventario, distribución por bodega y alertas críticas
     let inventoryValue = 0;
     const criticalList = [];
-    const warehouseMap = new Map<string, { warehouseName: string; totalValue: number }>();
+    const warehouseMap = new Map<number, { warehouseName: string; totalValue: number }>();
 
     for (const s of stocks) {
       const qty = Number(s.quantity);

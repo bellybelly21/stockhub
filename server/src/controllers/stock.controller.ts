@@ -30,7 +30,7 @@ export const getGlobalInventory = async (req: Request, res: Response): Promise<a
 
     const stockRecords = await prisma.stock.findMany({
       where: {
-        ...(warehouseId && warehouseId !== 'Todas' ? { warehouseId: String(warehouseId) } : {}),
+        ...(warehouseId && warehouseId !== 'Todas' ? { warehouseId: Number(warehouseId) } : {}),
         product: {
           ...(validStatus ? { status: validStatus } : {}),
           ...(search ? {
@@ -58,7 +58,11 @@ export const getGlobalInventory = async (req: Request, res: Response): Promise<a
 
 export const getWarehouseStock = async (req: Request, res: Response): Promise<any> => {
   try {
-    const warehouseId = String(req.params.warehouseId);
+    const warehouseId = Number(req.params.warehouseId);
+    if (isNaN(warehouseId)) {
+      return res.status(400).json({ success: false, error: 'ID de bodega inválido' });
+    }
+
     const stockRecords = await prisma.stock.findMany({
       where: { warehouseId },
       include: {
@@ -84,7 +88,9 @@ export const getWarehouseStock = async (req: Request, res: Response): Promise<an
  */
 export const registerStockEntry = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { productId, warehouseId, quantity } = req.body;
+    const parsedProductId = Number(req.body.productId);
+    const parsedWarehouseId = Number(req.body.warehouseId);
+    const parsedQuantity = Number(req.body.quantity);
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user?.id;
 
@@ -92,22 +98,27 @@ export const registerStockEntry = async (req: Request, res: Response): Promise<a
       return res.status(401).json({ success: false, error: 'Usuario no autenticado' });
     }
 
-    if (!productId || !warehouseId || !quantity || quantity <= 0) {
+    if (
+      isNaN(parsedProductId) ||
+      isNaN(parsedWarehouseId) ||
+      isNaN(parsedQuantity) ||
+      parsedQuantity <= 0
+    ) {
       return res.status(400).json({ success: false, error: 'Datos de entrada inválidos' });
     }
 
     const result = await StockService.addStock({
-      productId,
-      warehouseId,
-      quantity: Number(quantity),
-      userId
+      productId: parsedProductId,
+      warehouseId: parsedWarehouseId,
+      quantity: parsedQuantity,
+      userId,
     });
 
     return res.status(200).json({
       success: true,
       previousStock: result.previousStock,
       addedQuantity: result.addedQuantity,
-      newStock: result.newStock
+      newStock: result.newStock,
     });
   } catch (error: any) {
     console.error('[Stock Entry Error]:', error);
@@ -120,7 +131,10 @@ export const registerStockEntry = async (req: Request, res: Response): Promise<a
  */
 export const registerStockOutbound = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { productId, warehouseId, quantity, type, reason, comment } = req.body;
+    const parsedProductId = Number(req.body.productId);
+    const parsedWarehouseId = Number(req.body.warehouseId);
+    const parsedQuantity = Number(req.body.quantity);
+    const { type, reason, comment } = req.body;
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user?.id;
 
@@ -128,54 +142,66 @@ export const registerStockOutbound = async (req: Request, res: Response): Promis
       return res.status(401).json({ success: false, error: 'Usuario no autenticado' });
     }
 
-    if (!productId || !warehouseId || !quantity || !type || !reason || Number(quantity) <= 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Debe indicar producto, bodega, cantidad válida (> 0), tipo de egreso y motivo (reason).' 
+    if (
+      isNaN(parsedProductId) ||
+      isNaN(parsedWarehouseId) ||
+      isNaN(parsedQuantity) ||
+      parsedQuantity <= 0 ||
+      !type ||
+      !reason
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Debe indicar producto, bodega, cantidad válida (> 0), tipo de egreso y motivo (reason).',
       });
     }
 
     const result = await StockService.registerOutbound({
-      productId,
-      warehouseId,
-      quantity: Number(quantity),
+      productId: parsedProductId,
+      warehouseId: parsedWarehouseId,
+      quantity: parsedQuantity,
       userId,
       type,
       reason,
-      comment
+      comment,
     });
 
     return res.status(201).json({ success: true, data: result });
   } catch (error: any) {
     console.error('[Stock Outbound Error]:', error);
-    
+
     if (typeof error.message === 'string') {
       if (error.message.startsWith('INSUFFICIENT_STOCK')) {
         const available = error.message.split(':')[1];
-        return res.status(400).json({ 
-          success: false, 
-          error: `Stock insuficiente para realizar esta salida. Disponible: ${available}` 
+        return res.status(400).json({
+          success: false,
+          error: `Stock insuficiente para realizar esta salida. Disponible: ${available}`,
         });
       }
 
       if (error.message.startsWith('CONCURRENCY_ERROR')) {
-        return res.status(409).json({ 
-          success: false, 
-          error: 'Conflicto de concurrencia: el stock fue modificado por otro usuario. Reintente.' 
+        return res.status(409).json({
+          success: false,
+          error: 'Conflicto de concurrencia: el stock fue modificado por otro usuario. Reintente.',
         });
       }
     }
-    
+
     return res.status(500).json({ success: false, error: error.message || 'Error interno al registrar la salida de stock' });
   }
 };
 
 export const getCriticalStock = async (req: Request, res: Response): Promise<any> => {
   try {
+    const rawWarehouseId = req.query.warehouseId;
     const warehouseId =
-      typeof req.query.warehouseId === 'string' && req.query.warehouseId !== 'Todas'
-        ? req.query.warehouseId
+      typeof rawWarehouseId === 'string' && rawWarehouseId !== 'Todas'
+        ? Number(rawWarehouseId)
         : undefined;
+
+    if (warehouseId !== undefined && isNaN(warehouseId)) {
+      return res.status(400).json({ success: false, error: 'ID de bodega inválido' });
+    }
 
     const data = await StockService.getCriticalStock(warehouseId);
     return res.status(200).json({ success: true, data });

@@ -5,10 +5,10 @@ import { CreateProductInput, UpdateProductInput } from '../schemas/product.schem
 // Interfaz para recibir los parámetros que enviará el frontend
 export interface GetProductsQuery {
   limit?: number;
-  cursor?: string;
+  cursor?: number;
   search?: string;
   status?: ProductStatus;
-  warehouseId?: string;
+  warehouseId?: number;
 }
 
 export class ProductService {
@@ -57,7 +57,7 @@ export class ProductService {
     }
 
     // Filtro por Bodega específica
-    if (warehouseId && warehouseId !== 'Todas') {
+    if (warehouseId) {
       where.stocks = {
         some: {
           warehouseId: warehouseId,
@@ -93,7 +93,7 @@ export class ProductService {
     };
   }
 
-  static async getProductById(id: string) {
+  static async getProductById(id: number) {
     const product = await prisma.product.findUnique({ 
       where: { id },
       include: { stocks: { include: { warehouse: true } } }
@@ -104,7 +104,7 @@ export class ProductService {
     return product;
   }
 
-  static async updateProduct(id: string, data: UpdateProductInput) {
+  static async updateProduct(id: number, data: UpdateProductInput) {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error('Producto no encontrado');
   
@@ -124,7 +124,7 @@ export class ProductService {
     });
   }
   
-  static async deactivateProduct(id: string) {
+  static async deactivateProduct(id: number) {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) throw new Error('Producto no encontrado');
   
@@ -134,7 +134,7 @@ export class ProductService {
     });
   }
 
-  static async findByCodeOrSku(code: string, warehouseId?: string) {
+  static async findByCodeOrSku(code: string, warehouseId?: number) {
     const product = await prisma.product.findFirst({
       where: {
         OR: [
@@ -161,7 +161,7 @@ export class ProductService {
 
   static async validateSaleItems(
     tx: Prisma.TransactionClient,
-    items: { productId: string; expectedPrice: number; quantity: number }[]
+    items: { productId: number; expectedPrice: number; quantity: number }[]
   ) {
     const productIds = items.map(i => i.productId);
     

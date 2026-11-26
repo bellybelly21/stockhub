@@ -8,13 +8,12 @@ import { StockService } from './stock.service';
 export class SaleService {
   static async processSale(
     sellerId: string,
-    warehouseId: string,
+    warehouseId: number,
     data: CreateSaleInput,
     idempotencyKey: string
   ) {
     // ORDENAMIENTO LÉXICO para prevenir Deadlocks
-    const sortedItems = [...data.items].sort((a, b) => a.productId.localeCompare(b.productId));
-
+    const sortedItems = [...data.items].sort((a, b) => a.productId - b.productId);
     // Calcular hash determinista del payload ordenado
     const payloadHash = crypto
       .createHash('sha256')

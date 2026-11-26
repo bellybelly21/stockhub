@@ -1,41 +1,37 @@
 import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
+import { AuthService } from '../services/auth.service';
+import type { AuthUser } from '../types/auth';
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  rut?: string;
-  assignedWarehouseId?: string | null;
-}
+export { API_URL } from '../config/api';
+export type { AuthUser as User } from '../types/auth';
+
+const SESSION_FLAG_KEY = 'stockhub_has_session';
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   accessToken: string | null;
   isLoading: boolean;
-  login: (accessToken: string, userData: User) => void;
+  login: (accessToken: string, userData: AuthUser) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-export const API_URL = RAW_API_URL.endsWith('/api') ? RAW_API_URL.replace(/\/api$/, '') : RAW_API_URL;
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
-  
+
   const isCheckingAuth = useRef(false);
 
-  const login = (token: string, userData: User) => {
+  const login = (token: string, userData: AuthUser) => {
+    localStorage.setItem(SESSION_FLAG_KEY, '1');
     setAccessToken(token);
     setUser(userData);
-    
+
     let redirectPath = '/';
     if (userData.role === 'ADMIN') redirectPath = '/dashboard';
     else if (userData.role === 'BODEGUERO') redirectPath = '/inventory';
@@ -46,17 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(`${API_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest' // Bloqueo CSRF
-        },
-        credentials: 'include',
-      });
+      await AuthService.logout();
     } catch (error) {
       console.error('Error al notificar cierre de sesión al servidor:', error);
     } finally {
+      localStorage.removeItem(SESSION_FLAG_KEY);
       setAccessToken(null);
       setUser(null);
       navigate('/', { replace: true });
@@ -64,30 +54,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkAuth = async () => {
+    if (localStorage.getItem(SESSION_FLAG_KEY) !== '1') {
+      setAccessToken(null);
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     if (isCheckingAuth.current) return;
     isCheckingAuth.current = true;
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest' // Bloqueo CSRF
-        },
-        credentials: 'include',
-      });
-
-      const data = await response.json().catch(() => ({})); 
-
-      if (response.ok && data.success && data.accessToken && data.user) {
+      const data = await AuthService.refresh();
+      if (data.success && data.accessToken && data.user) {
         setAccessToken(data.accessToken);
         setUser(data.user);
       } else {
+        localStorage.removeItem(SESSION_FLAG_KEY);
         setAccessToken(null);
         setUser(null);
       }
     } catch (error) {
       console.error('[AuthCheck Error]:', error);
+      localStorage.removeItem(SESSION_FLAG_KEY);
       setAccessToken(null);
       setUser(null);
     } finally {
@@ -98,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuth();
-  }, []); 
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -109,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, FOURTEEN_MINUTES);
 
     return () => clearInterval(interval);
-  }, [accessToken]); 
+  }, [accessToken]);
 
   return (
     <AuthContext.Provider

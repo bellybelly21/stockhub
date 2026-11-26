@@ -8,8 +8,8 @@ export class StockService {
    */
   static async decrementAtomic(
     tx: Prisma.TransactionClient,
-    productId: string,
-    warehouseId: string,
+    productId: number,
+    warehouseId: number,
     quantity: Prisma.Decimal | number
   ) {
     const deductQty = new Prisma.Decimal(quantity);
@@ -49,8 +49,8 @@ export class StockService {
    */
   static async incrementAtomic(
     tx: Prisma.TransactionClient,
-    productId: string,
-    warehouseId: string,
+    productId: number,
+    warehouseId: number,
     quantity: Prisma.Decimal | number
   ) {
     const addQty = new Prisma.Decimal(quantity);
@@ -71,8 +71,8 @@ export class StockService {
   }
 
   static async registerOutbound(data: {
-    productId: string;
-    warehouseId: string;
+    productId: number;
+    warehouseId: number;
     quantity: number;
     userId: string;
     type: MovementType;
@@ -100,8 +100,8 @@ export class StockService {
 
   static async deductStockAtomic(
     tx: Prisma.TransactionClient,
-    warehouseId: string,
-    items: { productId: string; quantity: number }[]
+    warehouseId: number,
+    items: { productId: number; quantity: number }[]
   ) {
     for (const item of items) {
       await this.decrementAtomic(tx, item.productId, warehouseId, item.quantity);
@@ -109,8 +109,8 @@ export class StockService {
   }
 
   static async addStock(data: {
-    productId: string;
-    warehouseId: string;
+    productId: number;
+    warehouseId: number;
     quantity: number;
     userId: string;
   }) {
@@ -147,7 +147,7 @@ export class StockService {
     });
   }
 
-  static async getCriticalStock(warehouseId?: string) {
+  static async getCriticalStock(warehouseId?: number) {
     const stocks = await prisma.stock.findMany({
       where: {
         ...(warehouseId ? { warehouseId } : {}),
@@ -215,8 +215,8 @@ export class StockService {
 
     // Agrupar por bodega para identificar la de mayor déficit
     const warehouseStats = new Map<
-      string,
-      { warehouseId: string; warehouseName: string; criticalCount: number; deficitUnits: number }
+      number,
+      { warehouseId: number; warehouseName: string; criticalCount: number; deficitUnits: number }
     >();
 
     for (const item of criticalItems) {

@@ -12,7 +12,7 @@ import { useAuth, API_URL } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
 export interface Product {
-  id: string;
+  id: number;
   sku: string;
   barcode: string;
   name: string;
@@ -31,10 +31,14 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Estado del Modal de Cambio de Estado
-  const [statusModal, setStatusModal] = useState<{ isOpen: boolean; productId: string | null; currentStatus: string }>({
+  const [statusModal, setStatusModal] = useState<{
+    isOpen: boolean;
+    productId: number | null;
+    currentStatus: string;
+  }>({
     isOpen: false,
     productId: null,
-    currentStatus: ''
+    currentStatus: '',
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 

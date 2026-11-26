@@ -1,7 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Search, Filter, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, PackageMinus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Search,
+  Filter,
+  RefreshCw,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  PackageMinus,
+} from 'lucide-react';
 import { useInventory, InventoryProvider } from '../context/InventoryContext';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { ProductService } from '../services/product.service';
 import type { ProductStatus } from '../types/inventory';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -12,7 +21,7 @@ import type { Product } from './OutboundStockModal';
 
 function InventoryView() {
   const { accessToken } = useAuth();
-  
+
   const {
     inventory,
     warehouses,
@@ -35,44 +44,31 @@ function InventoryView() {
   const [products, setProducts] = useState<Product[]>([]);
   const [outboundModal, setOutboundModal] = useState<{ isOpen: boolean; productId?: string }>({
     isOpen: false,
-    productId: undefined
+    productId: undefined,
   });
 
-  // Cargar productos para el selector del Modal
-  const fetchProducts = async () => {
+  const loadProducts = useCallback(async () => {
+    if (!accessToken) return;
     try {
-      const response = await fetch(`${API_URL}/api/products`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.message || 'Error al cargar los productos');
-
-      let productsArray: Product[] = [];
-      if (Array.isArray(data)) productsArray = data;
-      else if (data && Array.isArray(data.products)) productsArray = data.products;
-      else if (data && Array.isArray(data.data)) productsArray = data.data;
-
-      setProducts(productsArray);
+      const list = await ProductService.getAll<Product>(accessToken);
+      setProducts(list);
     } catch (err: any) {
       console.error('Error al obtener productos para el modal:', err);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    loadProducts();
+  }, [loadProducts]);
 
-  // Si los filtros cambian, volvemos a la página 1
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedWarehouse, selectedStatus]);
 
-  // Cálculos de paginación
   const totalItems = inventory.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedInventory = inventory.slice(startIndex, startIndex + itemsPerPage);
-  // ============================
 
   const getStatusBadge = (status: ProductStatus) => {
     switch (status) {
@@ -94,17 +90,16 @@ function InventoryView() {
 
   const warehouseOptions = [
     { value: 'Todas', label: 'Todas las bodegas' },
-    ...warehouses.map((wh) => ({ value: wh.id, label: wh.name }))
+    ...warehouses.map((wh) => ({ value: wh.id, label: wh.name })),
   ];
 
   const statusOptions = [
     { value: 'Todos', label: 'Todos los estados' },
     { value: 'ACTIVO', label: 'Activo' },
     { value: 'EN_OFERTA', label: 'En Oferta' },
-    { value: 'INACTIVO', label: 'Inactivo' }
+    { value: 'INACTIVO', label: 'Inactivo' },
   ];
 
-  // Auto-refresh cada 15 segundos
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchInventory();
@@ -116,14 +111,14 @@ function InventoryView() {
   return (
     <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
       <div className="flex-1 overflow-y-auto">
-        
-        {/* Header */}
         <header className="mb-6 flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Inventario</h1>
-            <p className="text-slate-mid mt-1 text-sm">Consulta el stock actualizado de todos los productos</p>
+            <p className="text-slate-mid mt-1 text-sm">
+              Consulta el stock actualizado de todos los productos
+            </p>
           </div>
-          
+
           <div className="flex items-center flex-wrap sm:flex-nowrap gap-3 w-full sm:w-auto">
             <Button
               variant="ghost"
@@ -137,7 +132,7 @@ function InventoryView() {
             <Button
               variant="ghost"
               onClick={() => fetchInventory()}
-              disabled={loading && inventory.length === 0} 
+              disabled={loading && inventory.length === 0}
               className="h-10 w-10 !p-0 shrink-0 border border-light-gray text-slate-600 w-full sm:w-10"
               title="Actualizar tabla"
             >
@@ -146,9 +141,8 @@ function InventoryView() {
           </div>
         </header>
 
-        {/* Filtros */}
-        <form 
-          onSubmit={handleSearchSubmit} 
+        <form
+          onSubmit={handleSearchSubmit}
           className="bg-white rounded-xl border border-light-gray p-4 lg:p-6 mb-6 flex flex-col md:flex-row gap-4 items-end"
         >
           <div className="w-full md:flex-1">
@@ -189,7 +183,7 @@ function InventoryView() {
             <Button
               type="submit"
               variant="primary"
-              disabled={loading && inventory.length === 0} 
+              disabled={loading && inventory.length === 0}
               leftIcon={<Filter size={16} />}
               className="w-full md:w-auto"
             >
@@ -198,16 +192,19 @@ function InventoryView() {
           </div>
         </form>
 
-        {/* Tabla */}
         <div className="bg-surface rounded-xl border border-light-gray overflow-hidden">
-          
           {error && (
             <div className="p-4 bg-red-50 border-b border-red-200 text-danger text-sm font-medium flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} />
                 <span>{error}</span>
               </div>
-              <button onClick={() => fetchInventory()} className="underline text-xs hover:text-red-700">Reintentar</button>
+              <button
+                onClick={() => fetchInventory()}
+                className="underline text-xs hover:text-red-700"
+              >
+                Reintentar
+              </button>
             </div>
           )}
 
@@ -222,33 +219,57 @@ function InventoryView() {
             </div>
           ) : (
             <>
-              {/* Vista Desktop */}
               <div className="overflow-x-auto w-full">
                 <table className="w-full text-left border-collapse hidden md:table">
                   <thead>
                     <tr className="bg-[#F8FAFC] border-b border-light-gray">
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">SKU</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Código Barras</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Producto</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Marca</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Bodega</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider text-right">Stock</th>
-                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">Estado</th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        SKU
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        Código Barras
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        Producto
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        Marca
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        Bodega
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider text-right">
+                        Stock
+                      </th>
+                      <th className="py-4 px-6 text-[11px] font-bold text-slate-mid uppercase tracking-wider">
+                        Estado
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-light-gray bg-white text-sm">
                     {paginatedInventory.map((item, index) => {
                       const isCritical = item.stock <= item.criticalStock;
                       return (
-                        <tr key={`${item.sku}-${item.warehouse}-${index}`} className="hover:bg-slate-50 transition-colors">
+                        <tr
+                          key={`${item.sku}-${item.warehouse}-${index}`}
+                          className="hover:bg-slate-50 transition-colors"
+                        >
                           <td className="py-4 px-6 text-slate-mid font-medium">{item.sku}</td>
-                          <td className="py-4 px-6 text-slate-mid font-mono text-xs">{item.barcode}</td>
+                          <td className="py-4 px-6 text-slate-mid font-mono text-xs">
+                            {item.barcode}
+                          </td>
                           <td className="py-4 px-6 text-dark font-bold">{item.name}</td>
                           <td className="py-4 px-6 text-slate-mid">{item.brand}</td>
                           <td className="py-4 px-6 text-slate-mid">
-                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">{item.warehouse}</span>
+                            <span className="bg-slate-100 px-2 py-1 rounded text-xs">
+                              {item.warehouse}
+                            </span>
                           </td>
-                          <td className={`py-4 px-6 font-bold text-right text-base ${isCritical ? 'text-danger' : 'text-success'}`}>
+                          <td
+                            className={`py-4 px-6 font-bold text-right text-base ${
+                              isCritical ? 'text-danger' : 'text-success'
+                            }`}
+                          >
                             {item.stock}
                           </td>
                           <td className="py-4 px-6">{getStatusBadge(item.status)}</td>
@@ -259,12 +280,14 @@ function InventoryView() {
                 </table>
               </div>
 
-              {/* Vista Mobile */}
               <div className="flex flex-col divide-y divide-light-gray bg-white md:hidden">
                 {paginatedInventory.map((item, index) => {
                   const isCritical = item.stock <= item.criticalStock;
                   return (
-                    <div key={`${item.sku}-${item.warehouse}-${index}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors">
+                    <div
+                      key={`${item.sku}-${item.warehouse}-${index}`}
+                      className="p-4 flex flex-col gap-3 hover:bg-slate-50 transition-colors"
+                    >
                       <div className="flex justify-between items-start gap-2 flex-wrap!">
                         <div className="flex flex-col">
                           <span className="font-bold text-dark leading-tight">{item.name}</span>
@@ -284,8 +307,14 @@ function InventoryView() {
                           Bodega: {item.warehouse}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-mid uppercase tracking-wider font-semibold">Stock:</span>
-                          <span className={`font-bold text-lg leading-none ${isCritical ? 'text-danger' : 'text-success'}`}>
+                          <span className="text-xs text-slate-mid uppercase tracking-wider font-semibold">
+                            Stock:
+                          </span>
+                          <span
+                            className={`font-bold text-lg leading-none ${
+                              isCritical ? 'text-danger' : 'text-success'
+                            }`}
+                          >
                             {item.stock}
                           </span>
                         </div>
@@ -297,22 +326,23 @@ function InventoryView() {
             </>
           )}
 
-          {/* Footer / Pagination */}
           {totalItems > 0 && (
             <div className="p-4 lg:p-6 border-t border-light-gray bg-white flex flex-col sm:flex-row items-center justify-between text-sm text-slate-mid gap-4">
               <div className="font-medium">{totalItems} productos encontrados</div>
               <div className="flex items-center space-x-4">
-                <span>Página {currentPage} de {totalPages}</span>
+                <span>
+                  Página {currentPage} de {totalPages}
+                </span>
                 <div className="flex space-x-2">
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
                     className="h-8 px-3 flex items-center justify-center bg-white border border-light-gray text-slate-600 rounded-md font-medium transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <button 
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
                     className="h-8 px-3 flex items-center justify-center bg-white border border-light-gray text-slate-600 rounded-md font-medium transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -322,19 +352,20 @@ function InventoryView() {
               </div>
             </div>
           )}
-          
         </div>
       </div>
 
-      {/* Modal Decremento Excepcional */}
       <OutboundStockModal
-        isOpen={outboundModal.isOpen}
-        onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
-        products={products}
-        warehouses={warehouses}
-        initialProductId={outboundModal.productId}
-        onSuccess={fetchInventory} // Actualizamos el inventario cuando finaliza exitosamente
-      />
+  isOpen={outboundModal.isOpen}
+  onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
+  products={products}
+  warehouses={warehouses}
+  initialProductId={outboundModal.productId}
+  onSuccess={() => {
+    fetchInventory();
+    loadProducts();
+  }}
+/>
     </section>
   );
 }
