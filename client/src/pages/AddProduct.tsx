@@ -4,23 +4,21 @@ import { Save, X, AlertCircle } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
-
-import { useAuth, API_URL } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
+import { ProductService, type ProductPayload } from '../services/product.service';
 
 export default function ProductForm() {
   const navigate = useNavigate();
-  const { id } = useParams(); 
+  const { id } = useParams();
   const location = useLocation();
-  const { accessToken } = useAuth(); 
-  
+  const { accessToken } = useAuth();
+
   const isViewMode = location.pathname.includes('/view/');
   const isEditMode = location.pathname.includes('/edit/');
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Estado para controlar el modal de confirmación del status
   const [statusConfirm, setStatusConfirm] = useState({ isOpen: false, pendingValue: '' });
 
   const [formData, setFormData] = useState({
@@ -32,51 +30,50 @@ export default function ProductForm() {
     unitOfMeasure: 'UNIDAD',
     weight: '',
     volume: '',
-    basePrice: '', 
-    criticalStock: '10', 
+    basePrice: '',
+    criticalStock: '10',
     status: 'ACTIVO',
   });
 
   useEffect(() => {
-    if (id && (isEditMode || isViewMode)) {
-      const fetchProduct = async () => {
-        setIsLoadingData(true);
-        try {
-          const response = await fetch(`${API_URL}/api/products/${id}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
-          const result = await response.json();
-          
-          if (!response.ok) throw new Error(result.error || 'Error al cargar el producto');
-          
-          const p = result.data;
-          setFormData({
-            sku: p.sku || '',
-            barcode: p.barcode || '',
-            name: p.name || '',
-            brand: p.brand || '',
-            supplier: p.supplier || '',
-            unitOfMeasure: p.unitOfMeasure || 'UNIDAD',
-            weight: p.weight?.toString() || '',
-            volume: p.volume?.toString() || '',
-            basePrice: p.basePrice?.toString() || '', 
-            criticalStock: p.criticalStock?.toString() || '10', 
-            status: p.status || 'ACTIVO',
-          });
-        } catch (err: any) {
-          setError(err.message);
-        } finally {
-          setIsLoadingData(false);
-        }
-      };
-      fetchProduct();
-    }
+    if (!id || (!isEditMode && !isViewMode) || !accessToken) return;
+
+    let isMounted = true;
+    const loadProduct = async () => {
+      setIsLoadingData(true);
+      try {
+        const p = await ProductService.getById(accessToken, id);
+        if (!isMounted || !p) return;
+
+        setFormData({
+          sku: p.sku || '',
+          barcode: p.barcode || '',
+          name: p.name || '',
+          brand: p.brand || '',
+          supplier: p.supplier || '',
+          unitOfMeasure: p.unitOfMeasure || 'UNIDAD',
+          weight: p.weight?.toString() || '',
+          volume: p.volume?.toString() || '',
+          basePrice: p.basePrice?.toString() || '',
+          criticalStock: p.criticalStock?.toString() || '10',
+          status: p.status || 'ACTIVO',
+        });
+      } catch (err: any) {
+        if (isMounted) setError(err.message);
+      } finally {
+        if (isMounted) setIsLoadingData(false);
+      }
+    };
+
+    loadProduct();
+    return () => {
+      isMounted = false;
+    };
   }, [id, isEditMode, isViewMode, accessToken]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    // Interceptamos el cambio de estado para mostrar la confirmación
+
     if (name === 'status' && !isViewMode) {
       setStatusConfirm({ isOpen: true, pendingValue: value });
       return;
@@ -99,7 +96,7 @@ export default function ProductForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isViewMode) return;
+    if (isViewMode || !accessToken) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -108,9 +105,11 @@ export default function ProductForm() {
       const parsedBasePrice = parseInt(formData.basePrice, 10);
       const parsedCriticalStock = parseFloat(formData.criticalStock);
 
-      if (isNaN(parsedBasePrice)) throw new Error('El precio base debe ser un número válido.');
+      if (isNaN(parsedBasePrice)) {
+        throw new Error('El precio base debe ser un número válido.');
+      }
 
-      const payload: Record<string, any> = {
+      const payload: ProductPayload = {
         sku: formData.sku.trim(),
         barcode: formData.barcode.trim(),
         name: formData.name.trim(),
@@ -122,29 +121,17 @@ export default function ProductForm() {
         criticalStock: isNaN(parsedCriticalStock) ? 0 : parsedCriticalStock,
       };
 
-      if (formData.weight && formData.weight.trim() !== '') payload.weight = parseFloat(formData.weight);
-      if (formData.volume && formData.volume.trim() !== '') payload.volume = parseFloat(formData.volume);
+      if (formData.weight && formData.weight.trim() !== '') {
+        payload.weight = parseFloat(formData.weight);
+      }
+      if (formData.volume && formData.volume.trim() !== '') {
+        payload.volume = parseFloat(formData.volume);
+      }
 
-      const url = isEditMode ? `${API_URL}/api/products/${id}` : `${API_URL}/api/products`;
-      const method = isEditMode ? 'PATCH' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}` 
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.errors && Array.isArray(data.errors)) {
-          const zodErrors = data.errors.map((err: any) => `${err.path}: ${err.message}`).join(' | ');
-          throw new Error(`Datos inválidos: ${zodErrors}`);
-        }
-        throw new Error(data.error || data.message || 'Error al guardar los datos.');
+      if (isEditMode && id) {
+        await ProductService.update(accessToken, id, payload);
+      } else {
+        await ProductService.create(accessToken, payload);
       }
 
       navigate('/products');
@@ -155,10 +142,16 @@ export default function ProductForm() {
     }
   };
 
-  const pageTitle = isViewMode ? 'Detalles del producto' : isEditMode ? 'Editar producto' : 'Ficha de producto';
-  const pageSubtitle = isViewMode 
-    ? 'Visualizando información del producto' 
-    : isEditMode ? 'Modifique los campos necesarios' : 'Complete los campos para registrar un nuevo producto';
+  const pageTitle = isViewMode
+    ? 'Detalles del producto'
+    : isEditMode
+    ? 'Editar producto'
+    : 'Ficha de producto';
+  const pageSubtitle = isViewMode
+    ? 'Visualizando información del producto'
+    : isEditMode
+    ? 'Modifique los campos necesarios'
+    : 'Complete los campos para registrar un nuevo producto';
 
   if (isLoadingData) {
     return <div className="p-12 text-center text-slate-mid">Cargando información del producto...</div>;
@@ -180,40 +173,59 @@ export default function ProductForm() {
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          
           <div className="bg-white rounded-xl border border-light-gray p-6">
-            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Identificación del producto</h2>
+            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">
+              Identificación del producto
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">SKU <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  SKU <span className="text-danger">*</span>
+                </label>
                 <Input name="sku" value={formData.sku} onChange={handleChange} required disabled={isViewMode} />
                 {!isViewMode && <p className="text-xs text-slate-light mt-1.5">El SKU debe ser único.</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Código de barras <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Código de barras <span className="text-danger">*</span>
+                </label>
                 <Input name="barcode" value={formData.barcode} onChange={handleChange} required disabled={isViewMode} />
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl border border-light-gray p-6">
-            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Información general</h2>
+            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">
+              Información general
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 gap-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Nombre <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Nombre <span className="text-danger">*</span>
+                </label>
                 <Input name="name" value={formData.name} onChange={handleChange} required disabled={isViewMode} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Marca <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Marca <span className="text-danger">*</span>
+                </label>
                 <Input name="brand" value={formData.brand} onChange={handleChange} required disabled={isViewMode} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Proveedor <span className="text-danger">*</span></label>
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Proveedor <span className="text-danger">*</span>
+                </label>
                 <Input name="supplier" value={formData.supplier} onChange={handleChange} required disabled={isViewMode} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Unidad de medida <span className="text-danger">*</span></label>
-                <Select name="unitOfMeasure" value={formData.unitOfMeasure} onChange={handleChange} disabled={isViewMode}
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Unidad de medida <span className="text-danger">*</span>
+                </label>
+                <Select
+                  name="unitOfMeasure"
+                  value={formData.unitOfMeasure}
+                  onChange={handleChange}
+                  disabled={isViewMode}
                   options={[
                     { value: 'UNIDAD', label: 'Unidad' },
                     { value: 'KG', label: 'Kilogramos (kg)' },
@@ -234,19 +246,47 @@ export default function ProductForm() {
           </div>
 
           <div className="bg-white rounded-xl border border-light-gray p-6 ">
-            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">Control de stock y estado</h2>
+            <h2 className="text-sm font-bold text-dark-different mb-4 uppercase tracking-wide">
+              Control de stock y estado
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Stock crítico <span className="text-danger">*</span></label>
-                <Input name="criticalStock" type="number" step="0.001" min="0" value={formData.criticalStock} onChange={handleChange} required disabled={isViewMode} />
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Stock crítico <span className="text-danger">*</span>
+                </label>
+                <Input
+                  name="criticalStock"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={formData.criticalStock}
+                  onChange={handleChange}
+                  required
+                  disabled={isViewMode}
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Precio Base <span className="text-danger">*</span></label>
-                <Input name="basePrice" type="text" value={formData.basePrice ? new Intl.NumberFormat('es-CL').format(Number(formData.basePrice)) : ''} onChange={handlePriceChange} required disabled={isViewMode} />
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Precio Base <span className="text-danger">*</span>
+                </label>
+                <Input
+                  name="basePrice"
+                  type="text"
+                  value={formData.basePrice ? new Intl.NumberFormat('es-CL').format(Number(formData.basePrice)) : ''}
+                  onChange={handlePriceChange}
+                  required
+                  disabled={isViewMode}
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-dark mb-1.5">Estado <span className="text-danger">*</span></label>
-                <Select name="status" value={formData.status} onChange={handleChange} disabled={isViewMode}
+                <label className="block text-sm font-medium text-slate-dark mb-1.5">
+                  Estado <span className="text-danger">*</span>
+                </label>
+                <Select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  disabled={isViewMode}
                   options={[
                     { value: 'ACTIVO', label: 'Activo' },
                     { value: 'EN_OFERTA', label: 'En Oferta' },
@@ -268,7 +308,7 @@ export default function ProductForm() {
             >
               {isViewMode ? 'Volver' : 'Cancelar'}
             </Button>
-            
+
             {!isViewMode && (
               <Button
                 type="submit"
@@ -289,19 +329,17 @@ export default function ProductForm() {
           <div className="bg-white p-6 rounded-xl shadow-lg max-w-sm w-full mx-4 border border-light-gray">
             <h3 className="text-lg font-bold text-dark mb-2">Confirmar cambio</h3>
             <p className="text-slate-mid text-sm mb-6">
-              ¿Estás seguro que deseas cambiar el estado del producto a <strong className="text-dark">{statusConfirm.pendingValue}</strong>?
+              ¿Estás seguro que deseas cambiar el estado del producto a{' '}
+              <strong className="text-dark">{statusConfirm.pendingValue}</strong>?
             </p>
             <div className="flex justify-end gap-3">
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={() => setStatusConfirm({ isOpen: false, pendingValue: '' })}
               >
                 Cancelar
               </Button>
-              <Button 
-                variant="primary" 
-                onClick={confirmStatusChange}
-              >
+              <Button variant="primary" onClick={confirmStatusChange}>
                 Confirmar
               </Button>
             </div>

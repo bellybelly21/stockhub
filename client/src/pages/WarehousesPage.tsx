@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { Plus, Warehouse as WarehouseIcon, MapPin, AlertCircle } from 'lucide-react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { WarehouseService } from '../services/warehouse.service';
+import type { WarehouseOption } from '../types/inventory';
 import { Button } from '../components/ui/Button';
 
-export interface Warehouse {
-  id: string;
-  name: string;
+export interface Warehouse extends WarehouseOption {
   location: string | null;
   totalProducts: number;
   totalUnits: number;
@@ -33,34 +33,27 @@ export default function WarehousesPage() {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  const fetchWarehouses = async () => {
+  const fetchWarehouses = useCallback(async () => {
+    if (!accessToken) return;
+
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/warehouses`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Error al cargar las bodegas');
-      }
-
-      setWarehouses(Array.isArray(data.data) ? data.data : []);
+      const response = await WarehouseService.getActive(accessToken);
+      setWarehouses(Array.isArray(response.data) ? (response.data as Warehouse[]) : []);
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchWarehouses();
-  }, []);
+  }, [fetchWarehouses]);
 
   return (
     <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
-      {/* Header */}
       <header className="mb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Bodegas</h1>
@@ -83,7 +76,6 @@ export default function WarehousesPage() {
         )}
       </header>
 
-      {/* Error */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-danger text-sm font-medium flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div className="flex items-center gap-2">
@@ -99,7 +91,6 @@ export default function WarehousesPage() {
         </div>
       )}
 
-      {/* Contenido */}
       {loading ? (
         <div className="bg-white rounded-xl border border-light-gray p-12 flex flex-col items-center justify-center gap-3">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -116,7 +107,6 @@ export default function WarehousesPage() {
               key={warehouse.id}
               className="bg-white rounded-xl border border-light-gray p-5 sm:p-6 flex flex-col justify-between gap-5 hover:border-slate-300 transition-colors"
             >
-              {/* Icono, Nombre, Ubicación y Badge */}
               <div className="flex items-start justify-between gap-4 flex-row flex-wrap">
                 <div className="flex items-start gap-3.5 min-w-0 flex-row flex-wrap">
                   <div className="w-11 h-11 rounded-xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
@@ -143,7 +133,6 @@ export default function WarehousesPage() {
                 </span>
               </div>
 
-              {/* Métricas de stock */}
               <div className="pt-4 border-t border-light-gray grid justify-center grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold text-slate-light uppercase tracking-wider">

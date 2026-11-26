@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router';
 import { Save, X, AlertCircle } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { WarehouseService } from '../services/warehouse.service';
 
 export default function AddWarehouse() {
   const navigate = useNavigate();
@@ -40,6 +41,8 @@ export default function AddWarehouse() {
       return;
     }
 
+    if (!accessToken) return;
+
     setIsSubmitting(true);
 
     try {
@@ -50,22 +53,7 @@ export default function AddWarehouse() {
         payload.location = trimmedLocation;
       }
 
-      const response = await fetch(`${API_URL}/api/warehouses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const zodDetail = data.details?.[0]?.mensaje;
-        throw new Error(zodDetail || data.error || data.message || 'Error al crear la bodega.');
-      }
-
+      await WarehouseService.create(accessToken, payload);
       navigate('/warehouses');
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error inesperado');

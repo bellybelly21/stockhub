@@ -9,9 +9,8 @@ import {
   CheckCircle2,
   FileSpreadsheet,
 } from 'lucide-react';
-import { useAuth, API_URL } from '../context/AuthContext';
-
-type ReportType = 'stock' | 'sales' | 'sellers';
+import { useAuth } from '../context/AuthContext';
+import { ReportService, type ReportType } from '../services/report.service';
 
 function toInputDate(date: Date) {
   const y = date.getFullYear();
@@ -61,28 +60,17 @@ export default function ReportsPage() {
   };
 
   const handleDownload = async (type: ReportType) => {
+    if (!accessToken) return;
+
     setDownloading(type);
     setError(null);
 
     try {
-      const params =
-        type === 'stock'
-          ? ''
-          : `?from=${encodeURIComponent(appliedRange.from)}&to=${encodeURIComponent(appliedRange.to)}`;
-
-      const response = await fetch(`${API_URL}/api/reports/${type}${params}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'No se pudo generar el reporte');
-      }
-
-      const blob = await response.blob();
-      const disposition = response.headers.get('Content-Disposition');
-      const match = disposition?.match(/filename="(.+)"/);
-      const filename = match?.[1] ?? `reporte-${type}.xlsx`;
+      const { blob, filename } = await ReportService.downloadExcel(
+        accessToken,
+        type,
+        appliedRange
+      );
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -128,7 +116,6 @@ export default function ReportsPage() {
 
   return (
     <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12">
-      {/* Título y subtítulo */}
       <header>
         <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">
           Reportes
@@ -138,7 +125,6 @@ export default function ReportsPage() {
         </p>
       </header>
 
-      {/* Mensaje de error */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-danger text-sm font-medium flex items-center gap-2">
           <AlertCircle size={16} className="shrink-0" />
@@ -146,7 +132,6 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Filtros: Fecha desde, Fecha hasta y botón Generar reportes */}
       <form
         onSubmit={handleApplyFilter}
         className="bg-white rounded-xl border border-light-gray p-4 sm:p-5 flex flex-col md:flex-row md:items-end gap-4"
@@ -182,7 +167,6 @@ export default function ReportsPage() {
         </button>
       </form>
 
-      {/* Indicador del rango activo */}
       <div className="flex items-center justify-between text-xs text-slate-mid px-1">
         <span>
           Período activo para ventas y desempeño:{' '}
@@ -197,7 +181,6 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* 3 Tarjetas de Reportes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {reportCards.map((card) => {
           const Icon = card.icon;
