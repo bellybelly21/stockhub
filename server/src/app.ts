@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 
 import saleRoutes from './routes/sales.routes';
-import authRoutes from './routes/auth.routes'; 
+import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import productRoutes from './routes/product.routes';
 import movementRoutes from './routes/movement.routes';
@@ -17,49 +17,63 @@ import reportRoutes from './routes/report.routes';
 
 const app = express();
 
+// ============================================================================
+// DETECCIÓN DE ENTORNO (Local, Railway QA y Railway Producción)
+// ============================================================================
+const isQA = process.env.APP_ENV === 'qa';
+const isLocal = process.env.NODE_ENV !== 'production';
+const isLoadTestEnv = isLocal || isQA;
+
 // Confianza en proxy inverso (Railway / Cloudflare) para leer X-Forwarded-For real
 app.set('trust proxy', 1);
 app.use(helmet());
 
-// Lista de orígenes permitidos
+// ============================================================================
+// HEALTHCHECK (Antes de CORS y Rate Limit para monitoreo interno de Railway)
+// ============================================================================
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ============================================================================
+// CONFIGURACIÓN CORS ÚNICA
+// ============================================================================
+const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
+
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'https://stockhub-erp.up.railway.app',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+  'https://stockhub-frontend-qa.up.railway.app',
+  frontendUrl,
+].filter((origin): origin is string => Boolean(origin));
 
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key'], 
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Peticiones sin cabecera Origin (JMeter, Postman, curl): permitidas solo en Local y QA
+      if (!origin) {
+        if (isLocal || isQA) return callback(null, true);
+        return callback(new Error('Origen no permitido por CORS (Falta cabecera Origin)'));
+      }
 
-app.use(cors({
-  origin: (origin, callback) => {
-    const isQA = process.env.APP_ENV === 'qa';
-    
-    if (!origin) {
-      if (isQA) return callback(null, true);
-      return callback(new Error(`Origen no permitido por CORS (Falta cabecera Origin)`));
-    }
+      // Navegadores: valida contra lista blanca o cualquier subdominio en QA
+      if (allowedOrigins.includes(origin) || isQA) {
+        return callback(null, true);
+      }
 
-    if (allowedOrigins.includes(origin) || isQA) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origen ${origin} no permitido por CORS`));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH'], 
-  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
-  credentials: true,
-}));
+      return callback(new Error(`Origen ${origin} no permitido por CORS`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key'],
+    credentials: true,
+  })
+);
 
 const jsonParserStandard = express.json({ limit: '20kb' });
 const jsonParserLarge = express.json({ limit: '1mb' });
 
 app.use(cookieParser());
-
-const isLoadTestEnv = process.env.NODE_ENV !== 'production' || process.env.APP_ENV === 'qa';
 
 // ============================================================================
 // Defensa DoS gruesa por IP (Soporta múltiples POS tras NAT)
@@ -69,7 +83,7 @@ const globalIpLimiter = rateLimit({
   max: isLoadTestEnv ? 5000 : 1000, // >= 1.000 req/min por IP pública
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/api/health',
+  skip: (req) => req.path === '/health',
   message: { success: false, error: 'Tráfico anómalo detectado desde esta red. Intente en un minuto.' },
 });
 app.use('/api', globalIpLimiter);
@@ -83,9 +97,8 @@ const userApiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   validate: { keyGeneratorIpFallback: false },
-  skip: (req) => req.path === '/api/health' || req.path === '/api/auth/login',
+  skip: (req) => req.path === '/health' || req.path === '/auth/login',
   keyGenerator: (req) => {
-    // Extrae el userId del Bearer Token para aislar la cuota por usuario y no por IP NAT
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -116,16 +129,15 @@ const loginLimiter = rateLimit({
   skipSuccessfulRequests: true,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: (req) => {
-    const email = typeof req.body?.email === 'string' 
-      ? req.body.email.trim().toLowerCase() 
+    const email = typeof req.body?.email === 'string'
+      ? req.body.email.trim().toLowerCase()
       : 'unknown';
     return `${email}:${req.ip}`;
   },
   handler: (req, res) => {
     const attemptedEmail = req.body?.email || 'desconocido';
-    // Registro explícito de auditoría de seguridad
     console.warn(`[SECURITY_AUDIT] Bloqueo temporal (15m) por fuerza bruta | Email: ${attemptedEmail} | IP: ${req.ip}`);
-    
+
     return res.status(429).json({
       success: false,
       error: 'Cuenta bloqueada temporalmente por seguridad tras 5 intentos fallidos. Reintente en 15 minutos o solicite asistencia al Administrador.',
@@ -138,21 +150,19 @@ app.use('/api/auth/login', jsonParserStandard, loginLimiter);
 // ============================================================================
 // RUTAS DE LA APLICACIÓN
 // ============================================================================
-app.get('/api/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 app.use('/api/sales', jsonParserStandard, saleRoutes);
 app.use('/api/auth', jsonParserStandard, authRoutes);
 app.use('/api/users', jsonParserStandard, userRoutes);
 app.use('/api/dashboard', jsonParserStandard, dashboardRoutes);
-app.use('/api/reports', jsonParserStandard, reportRoutes)
+app.use('/api/reports', jsonParserStandard, reportRoutes);
 app.use('/api/products', jsonParserStandard, productRoutes);
 app.use('/api/movements', jsonParserLarge, movementRoutes);
 app.use('/api/warehouses', jsonParserStandard, warehouseRoutes);
 app.use('/api/stock', jsonParserLarge, stockRoutes);
 
-// Manejo de errores globales
+// ============================================================================
+// MANEJO DE ERRORES GLOBALES
+// ============================================================================
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err.type === 'entity.too.large' || err.status === 413) {
     return res.status(413).json({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Chart as ChartJS,
@@ -22,7 +22,8 @@ import {
   ArrowRight,
   AlertCircle,
 } from 'lucide-react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { DashboardService, type DashboardData } from '../services/dashboard.service';
 
 ChartJS.register(
   CategoryScale,
@@ -35,41 +36,6 @@ ChartJS.register(
   Tooltip,
   Filler
 );
-
-interface DashboardData {
-  kpis: {
-    salesToday: number;
-    salesChangePercent: number | null;
-    transactionsToday: number;
-    averageTicket: number;
-    criticalProductsCount: number;
-    inventoryValue: number;
-    activeWarehousesCount: number;
-  };
-  salesLast7Days: { date: string; label: string; total: number }[];
-  topProducts: { name: string; unitsSold: number }[];
-  inventoryByWarehouse?: {
-    warehouseName: string;
-    totalValue: number;
-    totalUnits?: number;
-  }[];
-  criticalAlerts: {
-    stockId: string;
-    productName: string;
-    warehouseName: string;
-    currentStock: number;
-    criticalStock: number;
-    deficit: number;
-  }[];
-  recentMovements: {
-    id: string;
-    type: string;
-    productName: string;
-    warehouseName: string;
-    quantity: number;
-    createdAt: string;
-  }[];
-}
 
 const formatCLP = (value: number) =>
   new Intl.NumberFormat('es-CL', {
@@ -162,30 +128,25 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
+    if (!accessToken) return;
+
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/dashboard/summary`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al cargar el dashboard');
-      }
-      setData(result.data);
+      const summary = await DashboardService.getSummary(accessToken);
+      setData(summary);
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchDashboard();
-  }, []);
+  }, [fetchDashboard]);
 
-  // Gráfico 1: Ventas últimos 7 días (Línea)
   const lineChartData = {
     labels: data?.salesLast7Days.map((d) => d.label) ?? [],
     datasets: [
@@ -241,7 +202,6 @@ export default function DashboardPage() {
     },
   };
 
-  // Gráfico 2: Top 5 productos más vendidos (Barras horizontales)
   const barChartData = {
     labels:
       data?.topProducts.map((p) =>
@@ -290,7 +250,6 @@ export default function DashboardPage() {
     },
   };
 
-  // Gráfico 3: Distribución de inventario por bodega (Dona)
   const warehouseDistribution = data?.inventoryByWarehouse ?? [];
 
   const warehouseChartData = {
@@ -353,13 +312,11 @@ export default function DashboardPage() {
 
   return (
     <section className="max-w-7xl mx-auto flex flex-col gap-6 mb-12 sm:px-0">
-      {/* Header */}
       <header>
         <h1 className="text-2xl lg:text-3xl font-bold text-dark tracking-tight">Dashboard</h1>
         <p className="text-slate-mid mt-1 text-sm">Resumen general del negocio</p>
       </header>
 
-      {/* Error */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-danger text-sm font-medium flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div className="flex items-center gap-2">
@@ -377,9 +334,7 @@ export default function DashboardPage() {
 
       {data && (
         <>
-          {/* Fila 1: 4 Tarjetas KPI */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
-            {/* KPI 1: Ventas del día */}
             <article className="bg-white rounded-xl border border-light-gray p-5 flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-mid">Ventas del día</span>
@@ -409,7 +364,6 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            {/* KPI 2: Transacciones hoy */}
             <article className="bg-white rounded-xl border border-light-gray p-5 flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-mid">Transacciones hoy</span>
@@ -427,7 +381,6 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            {/* KPI 3: Productos críticos */}
             <article
               onClick={() => navigate('/critical-stock')}
               className="bg-white rounded-xl border border-light-gray p-5 flex flex-col justify-between gap-3 cursor-pointer hover:border-red-300 transition-colors"
@@ -458,7 +411,6 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            {/* KPI 4: Valor inventario */}
             <article className="bg-white rounded-xl border border-light-gray p-5 flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-mid">Valor inventario</span>
@@ -481,9 +433,7 @@ export default function DashboardPage() {
             </article>
           </div>
 
-          {/* Fila 2: Gráficos principales */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Gráfico 1: Ventas últimos 7 días */}
             <div className="bg-white rounded-xl border border-light-gray p-5 sm:p-6 flex flex-col gap-4">
               <div>
                 <h2 className="text-base font-bold text-dark">Ventas últimos 7 días</h2>
@@ -494,7 +444,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Gráfico 2: Top 5 productos más vendidos */}
             <div className="bg-white rounded-xl border border-light-gray p-5 sm:p-6 flex flex-col gap-4">
               <div>
                 <h2 className="text-base font-bold text-dark">Productos más vendidos</h2>
@@ -514,9 +463,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Fila 3: Distribución de inventario por bodega + Movimientos recientes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Panel Izquierdo: Distribución de inventario por bodega */}
             <div className="bg-white rounded-xl border border-light-gray p-5 sm:p-6 flex flex-col gap-4">
               <div>
                 <h2 className="text-base font-bold text-dark">
@@ -537,7 +484,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Panel Derecho: Movimientos recientes (sin link a /movements) */}
             <div className="bg-white rounded-xl border border-light-gray overflow-hidden flex flex-col">
               <div className="px-5 sm:px-6 py-4 border-b border-light-gray flex items-center justify-between gap-2">
                 <h2 className="text-base font-bold text-dark truncate">
@@ -594,7 +540,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Fila 4: Alertas de stock crítico (Ancho completo) */}
           <div className="bg-white rounded-xl border border-light-gray overflow-hidden flex flex-col w-full">
             <div className="px-5 sm:px-6 py-4 border-b border-light-gray flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">

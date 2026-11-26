@@ -1,7 +1,17 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { InventoryService } from '../services/inventory.service';
 import type { InventoryItem, WarehouseOption } from '../types/inventory';
 import { useAuth } from './AuthContext';
+
+const SEARCH_DEBOUNCE_MS = 350;
 
 interface InventoryContextType {
   inventory: InventoryItem[];
@@ -20,23 +30,45 @@ interface InventoryContextType {
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, accessToken } = useAuth(); // Extraemos user además de accessToken
-
-  // Determinar la bodega inicial según el rol del usuario
-  const initialWarehouse = 
-    user?.role === 'BODEGUERO' && user.assignedWarehouseId 
-      ? user.assignedWarehouseId 
-      : 'Todas';
+  const { user, accessToken } = useAuth();
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Inicializamos el estado directamente con la bodega predeterminada
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>(initialWarehouse);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>(() =>
+    user?.role === 'BODEGUERO' && user.assignedWarehouseId
+      ? user.assignedWarehouseId
+      : 'Todas'
+  );
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+
+  const initializedForUserId = useRef<string | null>(user?.id ?? null);
+
+  // Sincroniza la bodega inicial cuando `user` carga después del primer render
+  useEffect(() => {
+    if (!user || initializedForUserId.current === user.id) return;
+
+    initializedForUserId.current = user.id;
+    const defaultWarehouse =
+      user.role === 'BODEGUERO' && user.assignedWarehouseId
+        ? user.assignedWarehouseId
+        : 'Todas';
+
+    setSelectedWarehouse(defaultWarehouse);
+  }, [user]);
+
+  // Debounce de búsqueda para evitar 1 request por tecla
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchInventory = useCallback(async () => {
     if (!accessToken) return;
@@ -47,17 +79,21 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       const res = await InventoryService.getGlobalInventory(accessToken, {
         warehouseId: selectedWarehouse,
         status: selectedStatus,
-        search: searchTerm,
+        search: debouncedSearch,
       });
       setInventory(res.data);
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error inesperado al consultar el inventario');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error inesperado al consultar el inventario';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [selectedWarehouse, selectedStatus, searchTerm, accessToken]);
+  }, [selectedWarehouse, selectedStatus, debouncedSearch, accessToken]);
 
-  // Carga de la lista de bodegas para los `<select>`
+  // Carga de la lista de bodegas para los <select>
   useEffect(() => {
     if (!accessToken) return;
 
@@ -73,7 +109,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     };
   }, [accessToken]);
 
-  // Ejecuta la búsqueda al cambiar filtros o al montar
+  // Ejecuta la búsqueda al cambiar filtros o el término con debounce
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);

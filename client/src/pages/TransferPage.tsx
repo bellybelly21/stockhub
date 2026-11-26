@@ -1,26 +1,28 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  ArrowRightLeft, 
-  AlertCircle, 
-  CheckCircle2, 
-  X, 
-  Check, 
-  ArrowLeft 
+import {
+  ArrowRightLeft,
+  AlertCircle,
+  CheckCircle2,
+  X,
+  Check,
+  ArrowLeft,
 } from 'lucide-react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { InventoryService } from '../services/inventory.service';
+import { ProductService } from '../services/product.service';
+import { MovementService } from '../services/movement.service';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 
 interface Product {
-  id: string;
+  id: number | string;
   name: string;
   sku: string;
 }
 
 interface Warehouse {
-  id: string;
+  id: number | string;
   name: string;
 }
 
@@ -35,19 +37,19 @@ interface TransferSuccessData {
 
 export default function TransferPage() {
   const { accessToken, user } = useAuth();
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  
+
   const [originStock, setOriginStock] = useState<number>(0);
   const [destStock, setDestStock] = useState<number>(0);
   const [loadingStock, setLoadingStock] = useState<boolean>(false);
-  
+
   const [selectedOrigin, setSelectedOrigin] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<string>('');
   const [selectedDestination, setSelectedDestination] = useState<string>('');
   const [quantity, setQuantity] = useState<number | ''>('');
-  
+
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,23 +63,22 @@ export default function TransferPage() {
 
     const fetchInitialData = async () => {
       try {
-        const [prodRes, whRes] = await Promise.all([
-          fetch(`${API_URL}/api/products`, { headers: { Authorization: `Bearer ${accessToken}` } }),
-          InventoryService.getActiveWarehouses(accessToken)
+        const [prodList, whRes] = await Promise.all([
+          ProductService.getAll<Product>(accessToken),
+          InventoryService.getActiveWarehouses(accessToken),
         ]);
 
         if (!isMounted) return;
 
-        const prodData = await prodRes.json();
-        setProducts(Array.isArray(prodData) ? prodData : prodData.data || []);
+        setProducts(prodList);
 
         const activeWarehouses = whRes.data || [];
         setWarehouses(activeWarehouses);
 
         if (user?.assignedWarehouseId) {
-          setSelectedOrigin(user.assignedWarehouseId);
+          setSelectedOrigin(String(user.assignedWarehouseId));
         } else if (isAdmin && activeWarehouses.length > 0) {
-          setSelectedOrigin(activeWarehouses[0].id);
+          setSelectedOrigin(String(activeWarehouses[0].id));
         }
       } catch {
         if (isMounted) setError('Error al cargar productos y bodegas.');
@@ -85,21 +86,32 @@ export default function TransferPage() {
     };
 
     fetchInitialData();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [accessToken, user, isAdmin]);
 
   const currentProduct = useMemo(
-    () => products.find(p => p.id === selectedProduct),
+    () =>
+      selectedProduct
+        ? products.find((p) => Number(p.id) === Number(selectedProduct))
+        : undefined,
     [products, selectedProduct]
   );
 
   const originWarehouseObj = useMemo(
-    () => warehouses.find(w => w.id === selectedOrigin),
+    () =>
+      selectedOrigin
+        ? warehouses.find((w) => Number(w.id) === Number(selectedOrigin))
+        : undefined,
     [warehouses, selectedOrigin]
   );
 
   const destWarehouseObj = useMemo(
-    () => warehouses.find(w => w.id === selectedDestination),
+    () =>
+      selectedDestination
+        ? warehouses.find((w) => Number(w.id) === Number(selectedDestination))
+        : undefined,
     [warehouses, selectedDestination]
   );
 
@@ -120,13 +132,24 @@ export default function TransferPage() {
     })
       .then((res) => {
         if (!isMounted) return;
-        const itemsBySku = res.data?.filter((item: any) => item.sku === currentProduct.sku) || [];
+        const itemsBySku =
+          res.data?.filter((item: any) => item.sku === currentProduct.sku) || [];
 
-        const originMatch = itemsBySku.find((i: any) => i.warehouse === originWarehouseObj?.name || i.warehouseId === selectedOrigin);
+        const originMatch = itemsBySku.find(
+          (i: any) =>
+            i.warehouse === originWarehouseObj?.name ||
+            (i.warehouseId !== undefined &&
+              Number(i.warehouseId) === Number(selectedOrigin))
+        );
         setOriginStock(originMatch ? Number(originMatch.stock) : 0);
 
         if (selectedDestination) {
-          const destMatch = itemsBySku.find((i: any) => i.warehouse === destWarehouseObj?.name || i.warehouseId === selectedDestination);
+          const destMatch = itemsBySku.find(
+            (i: any) =>
+              i.warehouse === destWarehouseObj?.name ||
+              (i.warehouseId !== undefined &&
+                Number(i.warehouseId) === Number(selectedDestination))
+          );
           setDestStock(destMatch ? Number(destMatch.stock) : 0);
         } else {
           setDestStock(0);
@@ -142,29 +165,47 @@ export default function TransferPage() {
         if (isMounted) setLoadingStock(false);
       });
 
-    return () => { isMounted = false; };
-  }, [currentProduct, selectedOrigin, selectedDestination, originWarehouseObj, destWarehouseObj, accessToken]);
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    currentProduct,
+    selectedOrigin,
+    selectedDestination,
+    originWarehouseObj,
+    destWarehouseObj,
+    accessToken,
+  ]);
 
-  const productOptions = useMemo(() => [
-    { value: '', label: 'Seleccione un producto...' },
-    ...products.map(p => ({ value: p.id, label: `${p.sku} - ${p.name}` }))
-  ], [products]);
+  const productOptions = useMemo(
+    () => [
+      { value: '', label: 'Seleccione un producto...' },
+      ...products.map((p) => ({ value: String(p.id), label: `${p.sku} - ${p.name}` })),
+    ],
+    [products]
+  );
 
-  const originOptions = useMemo(() => [
-    { value: '', label: 'Seleccionar origen...' },
-    ...warehouses.map(wh => ({ value: wh.id, label: wh.name }))
-  ], [warehouses]);
+  const originOptions = useMemo(
+    () => [
+      { value: '', label: 'Seleccionar origen...' },
+      ...warehouses.map((wh) => ({ value: String(wh.id), label: wh.name })),
+    ],
+    [warehouses]
+  );
 
-  const destinationOptions = useMemo(() => [
-    { value: '', label: 'Seleccionar destino...' },
-    ...warehouses
-      .filter(wh => wh.id !== selectedOrigin)
-      .map(wh => ({ value: wh.id, label: wh.name }))
-  ], [warehouses, selectedOrigin]);
+  const destinationOptions = useMemo(
+    () => [
+      { value: '', label: 'Seleccionar destino...' },
+      ...warehouses
+        .filter((wh) => Number(wh.id) !== Number(selectedOrigin))
+        .map((wh) => ({ value: String(wh.id), label: wh.name })),
+    ],
+    [warehouses, selectedOrigin]
+  );
 
   const handleOriginChange = (newOriginId: string) => {
     setSelectedOrigin(newOriginId);
-    if (selectedDestination === newOriginId) {
+    if (selectedDestination && Number(selectedDestination) === Number(newOriginId)) {
       setSelectedDestination('');
     }
   };
@@ -177,40 +218,34 @@ export default function TransferPage() {
     if (!selectedOrigin) return setError('Debe seleccionar una bodega de origen.');
     if (!selectedProduct) return setError('Debe seleccionar un producto.');
     if (!selectedDestination) return setError('Debe seleccionar una bodega de destino.');
-    if (selectedOrigin === selectedDestination) return setError('La bodega de origen y destino no pueden ser la misma.');
+    if (Number(selectedOrigin) === Number(selectedDestination)) {
+      return setError('La bodega de origen y destino no pueden ser la misma.');
+    }
     if (!qty || qty <= 0) return setError('La cantidad debe ser mayor a 0.');
     if (qty > originStock) {
-      return setError(`Stock insuficiente. Solo hay ${originStock} unidades disponibles en ${originWarehouseObj?.name || 'origen'}.`);
+      return setError(
+        `Stock insuficiente. Solo hay ${originStock} unidades disponibles en ${
+          originWarehouseObj?.name || 'origen'
+        }.`
+      );
     }
 
     setIsConfirmOpen(true);
   };
 
   const handleConfirmTransfer = async () => {
+    if (!accessToken) return;
     const qty = Number(quantity);
     setSubmitting(true);
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/movements`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          type: 'TRANSFERENCIA_SALIDA',
-          productId: selectedProduct,
-          fromWarehouseId: selectedOrigin,
-          toWarehouseId: selectedDestination,
-          quantity: qty
-        })
+      await MovementService.createTransfer(accessToken, {
+        productId: Number(selectedProduct),
+        fromWarehouseId: Number(selectedOrigin),
+        toWarehouseId: Number(selectedDestination),
+        quantity: qty,
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Error al procesar la transferencia');
-      }
 
       setSuccessData({
         quantity: qty,
@@ -266,9 +301,9 @@ export default function TransferPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl  border border-light-gray p-5 sm:p-7 flex flex-col gap-5">
+            <div className="bg-white rounded-xl border border-light-gray p-5 sm:p-7 flex flex-col gap-5">
               <h3 className="font-bold text-dark text-lg">Saldos actualizados</h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 sm:p-5 flex flex-col">
                   <span className="text-xs sm:text-sm font-medium text-slate-mid mb-1">
@@ -315,7 +350,7 @@ export default function TransferPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-light-gray p-6 md:p-8  w-full">
+          <div className="bg-white rounded-xl border border-light-gray p-6 md:p-8 w-full">
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 text-danger text-sm font-medium rounded-lg flex items-center gap-2">
                 <AlertCircle size={18} className="shrink-0" />
@@ -324,8 +359,7 @@ export default function TransferPage() {
             )}
 
             <form onSubmit={handlePreSubmit} className="flex flex-col gap-6">
-
-            <div>
+              <div>
                 <Select
                   label="Producto"
                   required
@@ -341,7 +375,11 @@ export default function TransferPage() {
                     {loadingStock ? (
                       <span className="text-slate-400 italic">Consultando...</span>
                     ) : (
-                      <span className={`font-bold ${originStock > 0 ? 'text-success' : 'text-danger'}`}>
+                      <span
+                        className={`font-bold ${
+                          originStock > 0 ? 'text-success' : 'text-danger'
+                        }`}
+                      >
                         {originStock}
                       </span>
                     )}
@@ -357,7 +395,11 @@ export default function TransferPage() {
                   onChange={(e) => handleOriginChange(e.target.value)}
                   options={originOptions}
                   disabled={!isAdmin}
-                  className={!isAdmin ? 'bg-slate-100 text-slate-600 border-slate-200 cursor-not-allowed' : 'bg-white border-slate-300'}
+                  className={
+                    !isAdmin
+                      ? 'bg-slate-100 text-slate-600 border-slate-200 cursor-not-allowed'
+                      : 'bg-white border-slate-300'
+                  }
                 />
                 {!isAdmin && (
                   <p className="text-xs text-slate-400 mt-1">
@@ -393,7 +435,13 @@ export default function TransferPage() {
               <div className="pt-2">
                 <Button
                   type="submit"
-                  disabled={submitting || loadingStock || originStock <= 0 || !selectedDestination || !quantity}
+                  disabled={
+                    submitting ||
+                    loadingStock ||
+                    originStock <= 0 ||
+                    !selectedDestination ||
+                    !quantity
+                  }
                   variant="primary"
                   className="w-full h-12 text-base font-semibold flex items-center justify-center gap-2"
                 >
@@ -409,10 +457,11 @@ export default function TransferPage() {
       {isConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 sm:p-6">
           <div className="bg-white rounded-xl shadow-lg w-full max-w-md border border-light-gray flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            
             <div className="flex items-center justify-between p-4 sm:p-5 pb-4 border-b border-light-gray">
-              <h3 className="text-base sm:text-lg font-bold text-dark">Confirmar transferencia</h3>
-              <button 
+              <h3 className="text-base sm:text-lg font-bold text-dark">
+                Confirmar transferencia
+              </h3>
+              <button
                 onClick={() => setIsConfirmOpen(false)}
                 disabled={submitting}
                 className="text-slate-light hover:text-slate-mid transition-colors p-1 rounded-md"

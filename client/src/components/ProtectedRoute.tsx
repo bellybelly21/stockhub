@@ -12,15 +12,27 @@ export default function ProtectedRoute({
   children,
   allowedRoles,
 }: ProtectedRouteProps) {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, isLoading } = useAuth();
   const location = useLocation();
+
+  // Espera a que finalice la verificación silenciosa (/api/auth/refresh) antes de redirigir
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-950 text-slate-300">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Verificando sesión...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!user || !accessToken) {
     return (
-      <Navigate 
-        to="/" 
-        state={{ from: location.pathname + location.search }} 
-        replace 
+      <Navigate
+        to="/"
+        state={{ from: location.pathname + location.search }}
+        replace
       />
     );
   }
@@ -39,16 +51,16 @@ export default function ProtectedRoute({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-slate-100 mb-2">
             Ups, no tienes acceso
           </h1>
-          
+
           <p className="text-slate-400 mb-8 leading-relaxed text-sm">
             Tu rol actual de <span className="font-semibold text-blue-400">{user.role}</span> no tiene los permisos necesarios para ver esta página.
           </p>
-          
-          <Link 
+
+          <Link
             to={homePath}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 flex justify-center items-center gap-2 text-sm"
           >

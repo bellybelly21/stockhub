@@ -34,14 +34,17 @@ export class AuthController {
 
   static async refresh(req: Request, res: Response) {
     try {
-      // Prevención estricta CSRF
       if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
         return res.status(403).json({ success: false, error: 'Falta cabecera anti-CSRF' });
       }
 
       const rawRefreshToken = req.cookies?.refreshToken;
       if (!rawRefreshToken) {
-        return res.status(200).json({ success: false, authenticated: false });
+        return res.status(401).json({
+          success: false,
+          authenticated: false,
+          error: 'No existe sesión activa',
+        });
       }
 
       const result = await AuthService.refresh(rawRefreshToken);
@@ -58,17 +61,24 @@ export class AuthController {
       });
     } catch (error: any) {
       res.clearCookie('refreshToken', getCookieOptions());
-      
-      if (error.message === 'Alerta de seguridad: Sesión comprometida' || error.message.includes('Jornada')) {
+
+      if (
+        error.message === 'Alerta de seguridad: Sesión comprometida' ||
+        error.message.includes('Jornada')
+      ) {
         return res.status(403).json({ success: false, error: error.message });
       }
-      return res.status(200).json({ success: false, authenticated: false });
+
+      return res.status(401).json({
+        success: false,
+        authenticated: false,
+        error: 'Sesión inválida o expirada',
+      });
     }
   }
 
   static async logout(req: Request, res: Response) {
     try {
-      // Prevención estricta CSRF
       if (req.headers['x-requested-with'] !== 'XMLHttpRequest') {
         return res.status(403).json({ success: false, error: 'Falta cabecera anti-CSRF' });
       }
