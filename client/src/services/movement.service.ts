@@ -86,7 +86,11 @@ export class MovementService {
           comment: payload.comment,
         };
 
-    return this.postMovement(token, body, 'No se pudo procesar el decremento.');
+        return this.postMovement(
+          token,
+          body as unknown as Record<string, unknown>,
+          'No se pudo procesar el decremento.'
+        );
   }
 
   static async createTransfer(token: string, payload: CreateTransferPayload) {

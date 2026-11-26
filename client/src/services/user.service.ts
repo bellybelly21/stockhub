@@ -6,7 +6,7 @@ export interface CreateUserPayload {
   email: string;
   role: Role;
   rut?: string;
-  assignedWarehouseId?: string;
+  assignedWarehouseId?: number | string | null;
   password?: string;
 }
 
@@ -14,7 +14,7 @@ export interface UpdateUserPayload {
   name: string;
   email: string;
   role: Role;
-  assignedWarehouseId?: string;
+  assignedWarehouseId?: number | string | null;
   password?: string;
 }
 
