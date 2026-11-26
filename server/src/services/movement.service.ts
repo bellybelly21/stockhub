@@ -6,7 +6,7 @@ import { CreateMovementInput } from '../schemas/movement.schema';
 interface ActorContext {
   id: string;
   role: Role;
-  assignedWarehouseId: string | null;
+  assignedWarehouseId: number | null;
 }
 
 export class MovementService {
@@ -68,9 +68,9 @@ export class MovementService {
   private static async executeTransfer(
     tx: Prisma.TransactionClient,
     params: {
-      productId: string;
-      fromWarehouseId: string;
-      toWarehouseId: string;
+      productId: number;
+      fromWarehouseId: number;
+      toWarehouseId: number;
       numericQty: Prisma.Decimal;
       userId: string;
       comment?: string | undefined;
@@ -79,7 +79,7 @@ export class MovementService {
     const { productId, fromWarehouseId, toWarehouseId, numericQty, userId, comment } = params;
 
     // Bloqueo ordenado por ID de bodega para prevenir deadlocks en concurrencia
-    const sortedWarehouses = [fromWarehouseId, toWarehouseId].sort();
+    const sortedWarehouses = [fromWarehouseId, toWarehouseId].sort((a, b) => a - b);
     for (const wId of sortedWarehouses) {
       if (wId === fromWarehouseId) {
         await StockService.decrementAtomic(tx, productId, fromWarehouseId, numericQty);

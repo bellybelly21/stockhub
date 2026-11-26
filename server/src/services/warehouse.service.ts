@@ -4,7 +4,7 @@ import { CreateWarehouseInput } from '../schemas/warehouse.schema';
 
 interface ActorContext {
   role: Role;
-  assignedWarehouseId: string | null;
+  assignedWarehouseId: number | null;
 }
 
 export class WarehouseService {

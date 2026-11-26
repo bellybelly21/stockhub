@@ -15,36 +15,34 @@ async function main() {
   console.log('🌱 Iniciando la carga de seed idempotente para StockHub ERP...');
 
   // ================= BODEGAS =================
-  const BODEGA_CENTRAL_ID = '018f9b90-0000-7000-8000-000000000001';
-  const BODEGA_NORTE_ID = '018f9b90-0000-7000-8000-000000000002';
-  const BODEGA_SUR_ID = '018f9b90-0000-7000-8000-000000000003';
-
   const bodegaCentral = await prisma.warehouse.upsert({
-    where: { id: BODEGA_CENTRAL_ID },
-    update: { name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
-    create: { id: BODEGA_CENTRAL_ID, name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
+    where: { name: 'Bodega Central' },
+    update: { location: 'Casa Matriz - Sector A', isActive: true },
+    create: { name: 'Bodega Central', location: 'Casa Matriz - Sector A', isActive: true },
   });
 
   const bodegaNorte = await prisma.warehouse.upsert({
-    where: { id: BODEGA_NORTE_ID },
-    update: { name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
-    create: { id: BODEGA_NORTE_ID, name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
+    where: { name: 'Bodega Norte' },
+    update: { location: 'Sucursal Norte', isActive: true },
+    create: { name: 'Bodega Norte', location: 'Sucursal Norte', isActive: true },
   });
 
   const bodegaSur = await prisma.warehouse.upsert({
-    where: { id: BODEGA_SUR_ID },
-    update: { name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
-    create: { id: BODEGA_SUR_ID, name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
+    where: { name: 'Bodega Sur' },
+    update: { location: 'Sucursal Sur', isActive: true },
+    create: { name: 'Bodega Sur', location: 'Sucursal Sur', isActive: true },
   });
 
-  console.log(`✅ Bodegas listas: ${bodegaCentral.name}, ${bodegaNorte.name}, ${bodegaSur.name}`);
+  console.log(
+    `✅ Bodegas listas: ${bodegaCentral.name} (#${bodegaCentral.id}), ${bodegaNorte.name} (#${bodegaNorte.id}), ${bodegaSur.name} (#${bodegaSur.id})`
+  );
 
   // ================= USUARIOS =================
-  const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@stockhub.cl';
+  const adminEmail = (process.env.INITIAL_ADMIN_EMAIL || 'admin@stockhub.cl').trim().toLowerCase();
   const rawAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin123456!';
   const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 12);
 
-  const adminUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: adminEmail },
     update: { password: hashedAdminPassword, rut: '11111111-1', assignedWarehouseId: bodegaCentral.id },
     create: {
@@ -61,12 +59,12 @@ async function main() {
   const sellerEmail = 'vendedor@stockhub.cl';
   const hashedSellerPassword = await bcrypt.hash('Vendedor123!', 12);
 
-  const sellerUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: sellerEmail },
     update: { password: hashedSellerPassword, rut: '22222222-2', assignedWarehouseId: bodegaCentral.id },
     create: {
       email: sellerEmail,
-      name: 'Juan Pérez (Vendedor)',
+      name: 'Juan Pérez',
       rut: '22222222-2',
       password: hashedSellerPassword,
       role: Role.VENDEDOR,
@@ -75,7 +73,24 @@ async function main() {
     },
   });
 
-  console.log(`✅ Usuarios listos: Admin y Vendedor`);
+  const warehouseEmail = 'bodeguero@stockhub.cl';
+  const hashedWarehousePassword = await bcrypt.hash('Bodeguero123!', 12);
+
+  await prisma.user.upsert({
+    where: { email: warehouseEmail },
+    update: { password: hashedWarehousePassword, rut: '3333333-1', assignedWarehouseId: bodegaNorte.id },
+    create: {
+      email: warehouseEmail,
+      name: 'María Gonzalez',
+      rut: '3333333-1',
+      password: hashedWarehousePassword,
+      role: Role.BODEGUERO,
+      isActive: true,
+      assignedWarehouseId: bodegaNorte.id,
+    },
+  });
+
+  console.log('✅ Usuarios listos: Admin, Vendedor y Bodeguero');
 
   // ================= PRODUCTOS =================
   const productosData = [
@@ -91,7 +106,6 @@ async function main() {
   ];
 
   for (const prod of productosData) {
-    // Crear o actualizar el producto
     const dbProduct = await prisma.product.upsert({
       where: { sku: prod.sku },
       update: { basePrice: prod.price, status: prod.status, criticalStock: prod.criticalStock },
@@ -108,7 +122,6 @@ async function main() {
       },
     });
 
-    // Asignar el stock a la bodega correspondiente
     await prisma.stock.upsert({
       where: {
         productId_warehouseId: {
@@ -125,7 +138,7 @@ async function main() {
     });
   }
 
-  console.log(`✅ Catálogo e inventario sincronizados (${productosData.length} productos asignados)`);
+  console.log(`✅ Catálogo e inventario sincronizados (${productosData.length} registros de stock)`);
   console.log('🚀 Seed ejecutado con éxito. Entorno listo para pruebas.');
 }
 

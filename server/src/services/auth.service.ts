@@ -1,39 +1,65 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db/client';
 import * as bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { invalidateUserStatusCache } from '../middlewares/auth.middleware';
+
+export const BCRYPT_SALT_ROUNDS = 10;
+
+// Hash bcrypt para mitigar timing attacks
+const DUMMY_HASH = '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
 
 export class AuthService {
-  static async revokeUserAccess(userId: string) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { 
-        isActive: false,
-        tokenVersion: { increment: 1 } // Invalida JWTs actuales
-      }
-    });
+  private static sanitizeUser(user: any) {
+    return {
+      id: user.id,
+      rut: user.rut,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      assignedWarehouseId: user.assignedWarehouseId,
+    };
+  }
 
-    await prisma.refreshToken.updateMany({
-      where: { userId, isRevoked: false },
-      data: { isRevoked: true, revokedAt: new Date() }
-    });
+  static async revokeUserAccess(userId: string) {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          isActive: false,
+          tokenVersion: { increment: 1 },
+        },
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId, isRevoked: false },
+        data: { isRevoked: true, revokedAt: new Date() },
+      }),
+    ]);
+
+    invalidateUserStatusCache(userId);
   }
 
   static async restoreUserAccess(userId: string) {
     await prisma.user.update({
       where: { id: userId },
-      data: { isActive: true }
+      data: { isActive: true },
     });
+
+    invalidateUserStatusCache(userId);
   }
-  
-  private static async generateTokens(user: any, existingAbsoluteExpiresAt?: Date) {
-    // Agregar tokenVersion al JWT
+
+  private static async generateTokens(
+    user: any,
+    existingAbsoluteExpiresAt?: Date,
+    dbClient: Prisma.TransactionClient | typeof prisma = prisma
+  ) {
     const accessToken = jwt.sign(
-      { 
-        id: user.id, 
-        role: user.role, 
+      {
+        id: user.id,
+        role: user.role,
         assignedWarehouseId: user.assignedWarehouseId,
-        tokenVersion: user.tokenVersion 
+        tokenVersion: user.tokenVersion,
       },
       process.env.JWT_SECRET as string,
       { expiresIn: '15m' }
@@ -41,18 +67,16 @@ export class AuthService {
 
     const rawRefreshToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
-    
     const MAX_SESSION_MS = 12 * 60 * 60 * 1000;
     const now = new Date();
-    // Mantener techo de 12h si es un refresh, o crear uno nuevo si es login
     const absoluteExpiresAt = existingAbsoluteExpiresAt || new Date(now.getTime() + MAX_SESSION_MS);
 
-    await prisma.refreshToken.create({
-      data: { 
-        tokenHash, 
-        expiresAt: absoluteExpiresAt, 
+    await dbClient.refreshToken.create({
+      data: {
+        tokenHash,
+        expiresAt: absoluteExpiresAt,
         absoluteExpiresAt,
-        userId: user.id 
+        userId: user.id,
       },
     });
 
@@ -62,10 +86,8 @@ export class AuthService {
 
   static async login(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
-    
-    const DUMMY_HASH = '$2b$10$abcdefghijklmnopqrstholaaaastockhub123445_678uuuuuuu';
+
     const passwordToCompare = user ? user.password : DUMMY_HASH;
-    
     const isPasswordValid = await bcrypt.compare(password, passwordToCompare);
 
     if (!user || !user.isActive || !isPasswordValid) {
@@ -76,14 +98,7 @@ export class AuthService {
 
     return {
       ...tokens,
-      user: {
-        id: user.id,
-        rut: user.rut,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        assignedWarehouseId: user.assignedWarehouseId,
-      },
+      user: this.sanitizeUser(user),
     };
   }
 
@@ -108,26 +123,32 @@ export class AuthService {
       throw new Error('Jornada laboral expirada. Por favor, inicie sesión nuevamente.');
     }
 
-    // ARQ-09: Ventana de gracia real (usando revokedAt, no createdAt)
-    const isRecentlyRevoked = storedToken.isRevoked && storedToken.revokedAt && 
-      (now.getTime() - new Date(storedToken.revokedAt).getTime() < 10000); // 10 segundos
+    // Ventana de gracia de 5 segundos para peticiones concurrentes legítimas
+    const isRecentlyRevoked =
+      storedToken.isRevoked &&
+      storedToken.revokedAt &&
+      now.getTime() - new Date(storedToken.revokedAt).getTime() < 5000;
 
     if (storedToken.isRevoked) {
       if (isRecentlyRevoked) {
-        // Emitimos solo un nuevo accessToken sin rotar
         const accessToken = jwt.sign(
-          { id: storedToken.user.id, role: storedToken.user.role, assignedWarehouseId: storedToken.user.assignedWarehouseId, tokenVersion: storedToken.user.tokenVersion },
+          {
+            id: storedToken.user.id,
+            role: storedToken.user.role,
+            assignedWarehouseId: storedToken.user.assignedWarehouseId,
+            tokenVersion: storedToken.user.tokenVersion,
+          },
           process.env.JWT_SECRET as string,
           { expiresIn: '15m' }
         );
-        return { 
-          accessToken, 
-          rawRefreshToken, // Se devuelve el mismo
+        return {
+          accessToken,
+          rawRefreshToken,
           expiresInMs: storedToken.absoluteExpiresAt.getTime() - now.getTime(),
-          user: storedToken.user 
+          user: this.sanitizeUser(storedToken.user),
         };
       } else {
-        // Robo de sesión detectado fuera de ventana de gracia
+        // Reutilización fuera de ventana de gracia: revocación total + limpieza de caché
         await prisma.$transaction([
           prisma.refreshToken.updateMany({
             where: { userId: storedToken.userId, isRevoked: false },
@@ -135,35 +156,32 @@ export class AuthService {
           }),
           prisma.user.update({
             where: { id: storedToken.userId },
-            data: { tokenVersion: { increment: 1 } }
-          })
+            data: { tokenVersion: { increment: 1 } },
+          }),
         ]);
+
+        invalidateUserStatusCache(storedToken.userId);
         throw new Error('Alerta de seguridad: Sesión comprometida');
       }
     }
 
-    // Rotación atómica dentro de una transacción
-    await prisma.$transaction(async (tx) => {
-      await tx.refreshToken.update({
-        where: { id: storedToken.id },
+    // Rotación 100% atómica en la misma transacción
+    const tokens = await prisma.$transaction(async (tx) => {
+      const updated = await tx.refreshToken.updateMany({
+        where: { id: storedToken.id, isRevoked: false },
         data: { isRevoked: true, revokedAt: now },
       });
-      // El generateTokens maneja su propio create, pero en una versión estricta 
-      // lo ideal sería pasarle el `tx`, aunque aquí Prisma resolverá bien de forma secuencial
-    });
 
-    const tokens = await this.generateTokens(storedToken.user, storedToken.absoluteExpiresAt);
+      if (updated.count === 0) {
+        throw new Error('Token ya rotado concurrentemente');
+      }
+
+      return this.generateTokens(storedToken.user, storedToken.absoluteExpiresAt, tx);
+    });
 
     return {
       ...tokens,
-      user: {
-        id: storedToken.user.id,
-        rut: storedToken.user.rut,
-        name: storedToken.user.name,
-        email: storedToken.user.email,
-        role: storedToken.user.role,
-        assignedWarehouseId: storedToken.user.assignedWarehouseId,
-      },
+      user: this.sanitizeUser(storedToken.user),
     };
   }
 

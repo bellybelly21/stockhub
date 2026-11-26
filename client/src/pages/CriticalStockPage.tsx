@@ -9,12 +9,12 @@ import { useAuth, API_URL } from '../context/AuthContext';
 
 interface CriticalStockItem {
   stockId: string;
-  productId: string;
+  productId: number;
   sku: string;
   productName: string;
   brand: string;
   unitOfMeasure: string;
-  warehouseId: string;
+  warehouseId: number;
   warehouseName: string;
   currentStock: number;
   criticalStock: number;
@@ -27,7 +27,7 @@ interface CriticalStockSummary {
   totalCriticalProducts: number;
   totalDeficitUnits: number;
   topDeficitWarehouse: {
-    warehouseId: string;
+    warehouseId: number;
     warehouseName: string;
     criticalCount: number;
     deficitUnits: number;
