@@ -94,11 +94,24 @@ export class MovementService {
     const productId = Number(payload.productId);
     const fromWarehouseId = Number(payload.fromWarehouseId);
 
-        return this.postMovement(
-          token,
-          body as unknown as Record<string, unknown>,
-          'No se pudo procesar el decremento.'
-        );
+    const body: CreateMovementPayload = {
+      productId,
+      fromWarehouseId,
+      quantity: signedQuantity,
+      type: effectiveType,
+      reason: payload.reason,
+      comment: payload.comment,
+    };
+
+    const result = await this.postMovement(token, body as unknown as Record<string, unknown>, 'No se pudo procesar el decremento.');
+
+    this.notifyStockChanged({
+      productId,
+      warehouseId: fromWarehouseId,
+      quantityDelta: -Math.abs(payload.rawQuantity),
+    });
+
+    return result;
   }
 
   static async createTransfer(token: string, payload: CreateTransferPayload) {

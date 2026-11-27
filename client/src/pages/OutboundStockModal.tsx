@@ -7,14 +7,14 @@ import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 
 export interface StockItem {
-  id: string | number;
+  id: string;
   quantity: number | string;
   warehouseId: number | string;
-  warehouse?: { id: number | string; name: string };
+  warehouse?: { id: string; name: string };
 }
 
 export interface Product {
-  id: string | number;
+  id: string;
   sku: string;
   barcode: string;
   name: string;
@@ -41,7 +41,7 @@ interface OutboundStockModalProps {
   onClose: () => void;
   products: Product[];
   warehouses?: Warehouse[];
-  initialProductId?: string | number;
+  initialProductId?: string;
   isPosMode?: boolean;
   onSuccess: (payload?: OutboundStockSuccessPayload) => void | Promise<void>;
 }

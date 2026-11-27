@@ -372,16 +372,13 @@ function InventoryView() {
       </div>
 
       <OutboundStockModal
-  isOpen={outboundModal.isOpen}
-  onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
-  products={products}
-  warehouses={warehouses}
-  initialProductId={outboundModal.productId}
-  onSuccess={() => {
-    fetchInventory();
-    loadProducts();
-  }}
-/>
+        isOpen={outboundModal.isOpen}
+        onClose={() => setOutboundModal({ isOpen: false, productId: undefined })}
+        products={products}
+        warehouses={warehouses}
+        initialProductId={outboundModal.productId}
+        onSuccess={handleOutboundSuccess}
+      />
     </section>
   );
 }
