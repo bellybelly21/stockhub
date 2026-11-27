@@ -9,20 +9,28 @@ interface ActorContext {
   assignedWarehouseId: number | null;
 }
 
+const SELLER_ALLOWED_REASONS = new Set(['DANADO_RECEPCION', 'MERMA_FISICA']);
+
 export class MovementService {
   static async createMovement(input: CreateMovementInput, actor: ActorContext) {
     const { type, quantity, productId, fromWarehouseId, toWarehouseId, reason, comment } = input;
 
-    // Reglas de dominio por Rol
+    // Reglas de dominio por Rol (HU-06B)
     if (actor.role === 'VENDEDOR') {
-      if (type !== 'AJUSTE' || quantity >= 0) {
+      if (type !== 'MERMA' || quantity <= 0) {
         throw new Error('FORBIDDEN_SELLER_TYPE');
       }
-      if (!actor.assignedWarehouseId || fromWarehouseId !== actor.assignedWarehouseId) {
+      if (!actor.assignedWarehouseId || fromWarehouseId !== actor.assignedWarehouseId || toWarehouseId) {
         throw new Error('FORBIDDEN_SELLER_WAREHOUSE');
       }
-      if (reason === 'MERMA_FISICA' || reason === 'DONACION') {
+      if (!reason || !SELLER_ALLOWED_REASONS.has(reason)) {
         throw new Error('FORBIDDEN_SELLER_REASON');
+      }
+    }
+
+    if (actor.role === 'BODEGUERO' && type === 'TRANSFERENCIA_SALIDA') {
+      if (!actor.assignedWarehouseId || fromWarehouseId !== actor.assignedWarehouseId) {
+        throw new Error('FORBIDDEN_WAREHOUSE_TRANSFER');
       }
     }
 

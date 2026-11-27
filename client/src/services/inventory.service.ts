@@ -31,6 +31,7 @@ export class InventoryService {
         Authorization: `Bearer ${token}`,
       },
       credentials: 'include',
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -49,6 +50,7 @@ export class InventoryService {
         Authorization: `Bearer ${token}`,
       },
       credentials: 'include',
+      cache: 'no-store',
     });
 
     if (!response.ok) {

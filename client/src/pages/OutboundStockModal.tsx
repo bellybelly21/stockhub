@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button';
 export interface StockItem {
   id: string;
   quantity: number | string;
-  warehouseId: number;
+  warehouseId: number | string;
   warehouse?: { id: string; name: string };
 }
 
@@ -30,6 +30,12 @@ export interface Warehouse {
   name: string;
 }
 
+export interface OutboundStockSuccessPayload {
+  productId: number;
+  warehouseId: number;
+  quantityDelta: number;
+}
+
 interface OutboundStockModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,7 +43,7 @@ interface OutboundStockModalProps {
   warehouses?: Warehouse[];
   initialProductId?: string;
   isPosMode?: boolean;
-  onSuccess: () => void;
+  onSuccess: (payload?: OutboundStockSuccessPayload) => void | Promise<void>;
 }
 
 export default function OutboundStockModal({
@@ -72,7 +78,7 @@ export default function OutboundStockModal({
           isSeller ? (user?.assignedWarehouseId ?? '') : (warehouses[0]?.id ?? '')
         ),
         quantity: '',
-        type: isSeller ? 'AJUSTE' : 'MERMA',
+        type: 'MERMA',
         reason: 'DANADO_RECEPCION',
         comment: '',
       });
@@ -125,19 +131,38 @@ export default function OutboundStockModal({
     }
     if (!accessToken) return;
 
+    const productId = Number(form.productId);
+    const warehouseId = Number(form.warehouseId);
+
     setSubmitting(true);
     try {
       await MovementService.createOutbound(accessToken, {
         productId: Number(form.productId),
         fromWarehouseId: Number(form.warehouseId),
         rawQuantity: qty,
-        type: isSeller ? 'AJUSTE' : form.type,
+        type: isSeller ? 'MERMA' : form.type,
         reason: form.reason,
         comment: trimmedComment || undefined,
         isSeller,
       });
 
-      onSuccess();
+      await onSuccess();
+      onClose();
+
+      const payload: OutboundStockSuccessPayload = {
+        productId,
+        warehouseId,
+        quantityDelta: -qty,
+      };
+
+      // Notifica a cualquier vista suscrita (ej. StockPage) para recargar sin esperar 15s
+      window.dispatchEvent(
+        new CustomEvent<OutboundStockSuccessPayload>('inventory:stock-changed', {
+          detail: payload,
+        })
+      );
+
+      await onSuccess(payload);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error inesperado al registrar la salida');
@@ -164,8 +189,8 @@ export default function OutboundStockModal({
 
   const reasonOptions = isSeller
     ? [
-        { value: 'DANADO_RECEPCION', label: 'Daño / Deterioro en tienda' },
-        { value: 'VENCIMIENTO', label: 'Producto vencido' },
+        { value: 'DANADO_RECEPCION', label: 'Daño en recepción / tienda' },
+        { value: 'MERMA_FISICA', label: 'Merma física / Deterioro' },
       ]
     : [
         { value: 'DANADO_RECEPCION', label: 'Daño en recepción' },

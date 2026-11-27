@@ -61,6 +61,18 @@ function InventoryView() {
     loadProducts();
   }, [loadProducts]);
 
+  // Mantiene sincronizado el stock disponible dentro del modal si cambia el inventario
+  useEffect(() => {
+    const handleStockChanged = () => {
+      loadProducts();
+    };
+
+    window.addEventListener('inventory:stock-changed', handleStockChanged);
+    return () => {
+      window.removeEventListener('inventory:stock-changed', handleStockChanged);
+    };
+  }, [loadProducts]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedWarehouse, selectedStatus]);
@@ -87,6 +99,10 @@ function InventoryView() {
     e.preventDefault();
     fetchInventory();
   };
+
+  const handleOutboundSuccess = useCallback(async () => {
+    await Promise.all([fetchInventory(), loadProducts()]);
+  }, [fetchInventory, loadProducts]);
 
   const warehouseOptions = [
     { value: 'Todas', label: 'Todas las bodegas' },
@@ -361,7 +377,7 @@ function InventoryView() {
         products={products}
         warehouses={warehouses}
         initialProductId={outboundModal.productId}
-        onSuccess={fetchInventory}
+        onSuccess={handleOutboundSuccess}
       />
     </section>
   );

@@ -26,7 +26,7 @@ export default function ProductsPage() {
 
   const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
-    productId: number | null;
+    productId: string | null;
     currentStatus: string;
   }>({
     isOpen: false,

@@ -182,14 +182,14 @@ export default function ProductForm() {
                 <label className="block text-sm font-medium text-slate-dark mb-1.5">
                   SKU <span className="text-danger">*</span>
                 </label>
-                <Input name="sku" value={formData.sku} onChange={handleChange} required disabled={isViewMode} />
+                <Input name="sku" value={formData.sku} onChange={handleChange} required disabled={isViewMode ||isEditMode} />
                 {!isViewMode && <p className="text-xs text-slate-light mt-1.5">El SKU debe ser único.</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-dark mb-1.5">
                   Código de barras <span className="text-danger">*</span>
                 </label>
-                <Input name="barcode" value={formData.barcode} onChange={handleChange} required disabled={isViewMode} />
+                <Input name="barcode" value={formData.barcode} onChange={handleChange} required disabled={isViewMode || isEditMode} />
               </div>
             </div>
           </div>
@@ -290,7 +290,6 @@ export default function ProductForm() {
                   options={[
                     { value: 'ACTIVO', label: 'Activo' },
                     { value: 'EN_OFERTA', label: 'En Oferta' },
-                    { value: 'DONADO', label: 'Donado' },
                     { value: 'INACTIVO', label: 'Inactivo' },
                   ]}
                 />

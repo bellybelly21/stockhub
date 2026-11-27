@@ -39,7 +39,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>(() =>
     user?.role === 'BODEGUERO' && user.assignedWarehouseId
-      ? user.assignedWarehouseId
+      ? String(user.assignedWarehouseId)
       : 'Todas'
   );
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
@@ -55,7 +55,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     initializedForUserId.current = user.id;
     const defaultWarehouse =
       user.role === 'BODEGUERO' && user.assignedWarehouseId
-        ? user.assignedWarehouseId
+        ? String(user.assignedWarehouseId)
         : 'Todas';
 
     setSelectedWarehouse(defaultWarehouse);
@@ -109,9 +109,21 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     };
   }, [accessToken]);
 
-  // Ejecuta la búsqueda al cambiar filtros o el término con debounce
+  // Ejecuta la búsqueda al montar o al cambiar filtros/término con debounce
   useEffect(() => {
     fetchInventory();
+  }, [fetchInventory]);
+
+  // Actualización puntual e inmediata cuando ocurre cualquier movimiento de stock
+  useEffect(() => {
+    const handleStockChanged = () => {
+      fetchInventory();
+    };
+
+    window.addEventListener('inventory:stock-changed', handleStockChanged);
+    return () => {
+      window.removeEventListener('inventory:stock-changed', handleStockChanged);
+    };
   }, [fetchInventory]);
 
   return (
