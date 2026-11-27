@@ -33,7 +33,7 @@ export default function ProductsPage() {
   // Estado del Modal de Cambio de Estado
   const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
-    productId: number | null;
+    productId: string | null;
     currentStatus: string;
   }>({
     isOpen: false,

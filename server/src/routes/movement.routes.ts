@@ -6,7 +6,7 @@ import { createMovementSchema } from '../schemas/movement.schema';
 
 const router = Router();
 
-const SELLER_ALLOWED_REASONS = ['DANADO_RECEPCION', 'VENCIMIENTO'];
+const SELLER_ALLOWED_REASONS = ['DANADO_RECEPCION', 'MERMA_FISICA'] as const;
 
 const enforceMovementRolePolicy = (req: Request, res: Response, next: NextFunction) => {
   const user = req.user;
@@ -19,11 +19,12 @@ const enforceMovementRolePolicy = (req: Request, res: Response, next: NextFuncti
       });
     }
 
-    // Solo puede registrar AJUSTE negativo
-    if (req.body?.type !== 'AJUSTE' || Number(req.body?.quantity) >= 0) {
+    // HU-06B: Solo puede registrar MERMA con cantidad positiva
+    const qty = Number(req.body?.quantity);
+    if (req.body?.type !== 'MERMA' || Number.isNaN(qty) || qty <= 0) {
       return res.status(403).json({
         success: false,
-        error: 'Los vendedores solo pueden registrar ajustes negativos por daño o vencimiento.',
+        error: 'Los vendedores solo pueden registrar mermas con cantidad positiva por daño o merma física.',
       });
     }
 
@@ -36,18 +37,37 @@ const enforceMovementRolePolicy = (req: Request, res: Response, next: NextFuncti
     }
 
     // Solo puede descontar de su propia bodega asignada
-    if (req.body?.fromWarehouseId !== user.assignedWarehouseId) {
+    if (Number(req.body?.fromWarehouseId) !== user.assignedWarehouseId) {
       return res.status(403).json({
         success: false,
         error: 'Solo puedes descontar stock de tu bodega asignada.',
       });
     }
 
-    // Solo motivos permitidos para vendedor
+    // Solo motivos permitidos para vendedor (HU-06B)
     if (!SELLER_ALLOWED_REASONS.includes(req.body?.reason)) {
       return res.status(403).json({
         success: false,
-        error: 'Motivo de ajuste no permitido para el rol de vendedor.',
+        error: 'Motivo de merma no permitido para el rol de vendedor.',
+      });
+    }
+  }
+
+  if (user?.role === 'BODEGUERO' && req.body?.type === 'TRANSFERENCIA_SALIDA') {
+    if (!user.assignedWarehouseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'El bodeguero no tiene una bodega operativa asignada.',
+      });
+    }
+
+    if (
+      req.body?.fromWarehouseId !== undefined &&
+      Number(req.body.fromWarehouseId) !== user.assignedWarehouseId
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'Solo puedes transferir stock desde tu bodega asignada.',
       });
     }
   }

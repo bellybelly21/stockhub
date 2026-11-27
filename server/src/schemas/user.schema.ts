@@ -26,18 +26,10 @@ export const createUserSchema = z.object({
       assignedWarehouseId: nullableIntId('ID de bodega inválido'),
       isActive: z.boolean().optional(),
     })
-    .refine(
-      (data) => {
-        if ((data.role === Role.VENDEDOR || data.role === Role.BODEGUERO) && !data.assignedWarehouseId) {
-          return false;
-        }
-        return true;
-      },
-      {
-        message: 'Los Vendedores y Bodegueros deben tener una bodega asignada',
-        path: ['assignedWarehouseId'],
-      }
-    ),
+    .refine((data) => Boolean(data.assignedWarehouseId), {
+      message: 'Todos los usuarios deben tener una bodega asignada',
+      path: ['assignedWarehouseId'],
+    }),
 });
 
 export const updateUserSchema = z.object({
@@ -61,21 +53,10 @@ export const updateUserSchema = z.object({
       assignedWarehouseId: nullableIntId('ID de bodega inválido'),
       isActive: z.boolean().optional(),
     })
-    .refine(
-      (data) => {
-        if (
-          (data.role === Role.VENDEDOR || data.role === Role.BODEGUERO) &&
-          data.assignedWarehouseId === null
-        ) {
-          return false;
-        }
-        return true;
-      },
-      {
-        message: 'Los Vendedores y Bodegueros deben tener una bodega asignada',
-        path: ['assignedWarehouseId'],
-      }
-    ),
+    .refine((data) => data.assignedWarehouseId !== null, {
+      message: 'Todos los usuarios deben tener una bodega asignada',
+      path: ['assignedWarehouseId'],
+    }),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];

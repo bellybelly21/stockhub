@@ -10,7 +10,7 @@ export type MovementReason =
 
 const SELLER_ALLOWED_REASONS: readonly MovementReason[] = [
   'DANADO_RECEPCION',
-  'VENCIMIENTO',
+  'MERMA_FISICA',
 ];
 
 export interface CreateMovementPayload {
@@ -26,8 +26,8 @@ export interface CreateOutboundInput {
   productId: number;
   fromWarehouseId: number;
   rawQuantity: number;
-  type: OutboundMovementType | string;
-  reason: MovementReason | string;
+  type: string;
+  reason: string;
   comment?: string;
   isSeller?: boolean;
 }
@@ -39,7 +39,21 @@ export interface CreateTransferPayload {
   quantity: number;
 }
 
+export interface StockChangedDetail {
+  productId: number;
+  warehouseId: number;
+  quantityDelta: number;
+}
+
 export class MovementService {
+  private static notifyStockChanged(detail: StockChangedDetail) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent<StockChangedDetail>('inventory:stock-changed', { detail })
+      );
+    }
+  }
+
   private static async postMovement(
     token: string,
     body: Record<string, unknown>,
@@ -63,28 +77,22 @@ export class MovementService {
   }
 
   static async createOutbound(token: string, payload: CreateOutboundInput) {
-    // Los vendedores solo pueden registrar ajustes negativos por daño en recepción o vencimiento
+    // HU-06B: Los vendedores solo pueden registrar mermas por daño en recepción o merma física
     if (payload.isSeller && !SELLER_ALLOWED_REASONS.includes(payload.reason as MovementReason)) {
       throw new Error(
-        'Los vendedores solo pueden registrar ajustes negativos por daño en recepción o vencimiento.'
+        'Los vendedores solo pueden registrar mermas por daño en recepción o merma física.'
       );
     }
 
-    const effectiveType = payload.isSeller ? 'AJUSTE' : payload.type;
+    const effectiveType = payload.isSeller ? 'MERMA' : payload.type;
 
     const signedQuantity =
       effectiveType === 'AJUSTE'
         ? -Math.abs(payload.rawQuantity)
         : Math.abs(payload.rawQuantity);
 
-        const body: CreateMovementPayload = {
-          productId: Number(payload.productId),
-          fromWarehouseId: Number(payload.fromWarehouseId),
-          quantity: signedQuantity,
-          type: effectiveType,
-          reason: payload.reason,
-          comment: payload.comment,
-        };
+    const productId = Number(payload.productId);
+    const fromWarehouseId = Number(payload.fromWarehouseId);
 
         return this.postMovement(
           token,
@@ -94,16 +102,29 @@ export class MovementService {
   }
 
   static async createTransfer(token: string, payload: CreateTransferPayload) {
-    return this.postMovement(
+    const productId = Number(payload.productId);
+    const fromWarehouseId = Number(payload.fromWarehouseId);
+    const toWarehouseId = Number(payload.toWarehouseId);
+    const quantity = Number(payload.quantity);
+
+    const result = await this.postMovement(
       token,
       {
         type: 'TRANSFERENCIA_SALIDA',
-        productId: Number(payload.productId),
-        fromWarehouseId: Number(payload.fromWarehouseId),
-        toWarehouseId: Number(payload.toWarehouseId),
-        quantity: Number(payload.quantity),
+        productId,
+        fromWarehouseId,
+        toWarehouseId,
+        quantity,
       },
       'Error al procesar la transferencia'
     );
+
+    this.notifyStockChanged({
+      productId,
+      warehouseId: fromWarehouseId,
+      quantityDelta: -Math.abs(quantity),
+    });
+
+    return result;
   }
 }
