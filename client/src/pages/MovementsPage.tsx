@@ -26,7 +26,7 @@ interface Product {
   supplier: string;
   unitOfMeasure: string;
   stock?: number;
-  status: 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO' | 'DONADO';
+  status: 'ACTIVO' | 'EN_OFERTA' | 'INACTIVO';
 }
 
 interface EntryResult {
@@ -36,7 +36,8 @@ interface EntryResult {
 }
 
 export default function MerchandiseEntryPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
 
@@ -60,7 +61,12 @@ export default function MerchandiseEntryPage() {
         if (!isMounted) return;
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setWarehouses(res.data);
-          setWarehouse((prev) => prev || String(res.data[0].id));
+          // Para bodegueros, pre-seleccionar su bodega asignada; para admin, la primera disponible
+          if (!isAdmin && user?.assignedWarehouseId) {
+            setWarehouse(String(user.assignedWarehouseId));
+          } else {
+            setWarehouse((prev) => prev || String(res.data[0].id));
+          }
         }
       })
       .catch((err) => {
@@ -183,8 +189,13 @@ export default function MerchandiseEntryPage() {
                 value={warehouse}
                 onChange={(e) => setWarehouse(e.target.value)}
                 options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
-                disabled={warehouses.length === 0}
+                disabled={warehouses.length === 0 || !isAdmin}
               />
+              {!isAdmin && (
+                <p className="text-xs text-slate-light mt-2">
+                  Solo los administradores pueden cambiar la bodega de destino.
+                </p>
+              )}
             </div>
 
             <div>

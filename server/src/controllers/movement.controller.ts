@@ -15,6 +15,10 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
     status: 403,
     message: 'Motivo de ajuste no permitido para el rol de vendedor.',
   },
+  FORBIDDEN_WAREHOUSE_TRANSFER: {
+    status: 403,
+    message: 'Solo puedes transferir stock desde tu bodega asignada.',
+  },
   CONCURRENCY_ERROR: {
     status: 409,
     message: 'Conflicto de concurrencia: el inventario fue actualizado por otro usuario. Reintente.',

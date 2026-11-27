@@ -217,7 +217,7 @@ export default function SalesPage() {
   const modalProducts: Product[] = useMemo(() => {
     if (!user?.assignedWarehouseId) return [];
     return products.map((p) => ({
-      id: p.productId,
+      id: String(p.productId),
       sku: p.sku,
       barcode: '',
       name: p.name,
@@ -489,7 +489,7 @@ export default function SalesPage() {
         products={modalProducts}
         warehouses={modalWarehouses}
         isPosMode={true}
-        initialProductId={cart[0]?.product.productId}
+        initialProductId={cart[0]?.product.productId ? String(cart[0].product.productId) : undefined}
         onSuccess={() => {
           fetchCatalog(true);
         }}

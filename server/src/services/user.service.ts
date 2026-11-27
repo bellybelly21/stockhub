@@ -50,6 +50,7 @@ export class UserService {
         name: true,
         role: true,
         isActive: true,
+        assignedWarehouseId: true,
         assignedWarehouse: { select: { id: true, name: true } },
         createdAt: true,
       },

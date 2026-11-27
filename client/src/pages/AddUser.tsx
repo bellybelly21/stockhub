@@ -46,6 +46,8 @@ export default function AddUser() {
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const initialRun = editingUser?.run || editingUser?.rut || '';
+  const initialWarehouseId =
+    editingUser?.assignedWarehouseId ?? editingUser?.assignedWarehouse?.id ?? '';
 
   const [formData, setFormData] = useState<CreateUserData>({
     run: initialRun ? formatRun(initialRun) : '',
@@ -54,7 +56,7 @@ export default function AddUser() {
     password: '',
     confirmPassword: '',
     role: editingUser?.role || 'VENDEDOR',
-    assignedWarehouseId: editingUser?.assignedWarehouseId || '',
+    assignedWarehouseId: initialWarehouseId ? String(initialWarehouseId) : '',
   });
 
   // Limpia el timeout de redirección si el componente se desmonta antes de cumplirse
@@ -112,11 +114,8 @@ export default function AddUser() {
       }
     }
 
-    if (
-      (formData.role === 'VENDEDOR' || formData.role === 'BODEGUERO') &&
-      !formData.assignedWarehouseId
-    ) {
-      errors.warehouse = 'Debe asignar una bodega para este rol';
+    if (!formData.assignedWarehouseId) {
+      errors.warehouse = 'Debe asignar una bodega al usuario';
     }
 
     setFormErrors(errors);
@@ -134,9 +133,9 @@ export default function AddUser() {
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
-      assignedWarehouseId:formData.assignedWarehouseId
-      ? Number(formData.assignedWarehouseId)
-      : null,
+      assignedWarehouseId: formData.assignedWarehouseId
+        ? Number(formData.assignedWarehouseId)
+        : null,
     };
 
     if (!isEdit) {
@@ -281,7 +280,6 @@ export default function AddUser() {
                 setFormData((prev) => ({
                   ...prev,
                   role: e.target.value as Role,
-                  assignedWarehouseId: '',
                 }))
               }
               options={ROLE_OPTIONS}
@@ -294,18 +292,19 @@ export default function AddUser() {
               </p>
             </div>
 
-            {(formData.role === 'VENDEDOR' || formData.role === 'BODEGUERO') && (
-              <Select
-                label="Bodega Asignada"
-                required
-                value={formData.assignedWarehouseId || ''}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, assignedWarehouseId: e.target.value }))
+            <Select
+              label="Bodega Asignada"
+              required
+              value={formData.assignedWarehouseId || ''}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, assignedWarehouseId: e.target.value }));
+                if (formErrors.warehouse) {
+                  setFormErrors((prev) => ({ ...prev, warehouse: '' }));
                 }
-                options={warehouseOptions}
-                error={formErrors.warehouse}
-              />
-            )}
+              }}
+              options={warehouseOptions}
+              error={formErrors.warehouse}
+            />
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
