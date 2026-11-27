@@ -133,9 +133,9 @@ export default function AddUser() {
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
       role: formData.role,
-      assignedWarehouseId: formData.assignedWarehouseId
-        ? Number(formData.assignedWarehouseId)
-        : null,
+      assignedWarehouseId:formData.assignedWarehouseId
+      ? Number(formData.assignedWarehouseId)
+      : null,
     };
 
     if (!isEdit) {

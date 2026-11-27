@@ -6,6 +6,8 @@ import type { AuthUser } from '../types/auth';
 export { API_URL } from '../config/api';
 export type { AuthUser as User } from '../types/auth';
 
+const SESSION_FLAG_KEY = 'stockhub_has_session';
+
 interface AuthContextType {
   user: AuthUser | null;
   accessToken: string | null;
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isCheckingAuth = useRef(false);
 
   const login = (token: string, userData: AuthUser) => {
+    localStorage.setItem(SESSION_FLAG_KEY, '1');
     setAccessToken(token);
     setUser(userData);
 
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error al notificar cierre de sesión al servidor:', error);
     } finally {
+      localStorage.removeItem(SESSION_FLAG_KEY);
       setAccessToken(null);
       setUser(null);
       navigate('/', { replace: true });
@@ -50,6 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkAuth = async () => {
+    if (localStorage.getItem(SESSION_FLAG_KEY) !== '1') {
+      setAccessToken(null);
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     if (isCheckingAuth.current) return;
     isCheckingAuth.current = true;
 
@@ -59,11 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessToken(data.accessToken);
         setUser(data.user);
       } else {
+        localStorage.removeItem(SESSION_FLAG_KEY);
         setAccessToken(null);
         setUser(null);
       }
     } catch (error) {
       console.error('[AuthCheck Error]:', error);
+      localStorage.removeItem(SESSION_FLAG_KEY);
       setAccessToken(null);
       setUser(null);
     } finally {
